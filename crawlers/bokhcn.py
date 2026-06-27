@@ -43,6 +43,7 @@ HEADERS = {
 }
 
 REQUEST_TIMEOUT = 25
+FETCH_RETRIES = 2
 POLITE_DELAY_SECONDS = 0.8
 
 
@@ -144,13 +145,30 @@ def normalize_for_search(text: str) -> str:
 
 
 def fetch_html(session: requests.Session, url: str) -> str:
-    response = session.get(url, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
+    last_exc: Optional[Exception] = None
 
-    if not response.encoding or response.encoding.lower() == "iso-8859-1":
-        response.encoding = response.apparent_encoding
+    for attempt in range(1, FETCH_RETRIES + 1):
+        try:
+            response = session.get(url, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
 
-    return response.text
+            if not response.encoding or response.encoding.lower() == "iso-8859-1":
+                response.encoding = response.apparent_encoding
+
+            return response.text
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < FETCH_RETRIES:
+                logging.warning(
+                    "Fetch failed attempt %s/%s for %s: %s",
+                    attempt,
+                    FETCH_RETRIES,
+                    url,
+                    exc,
+                )
+                time.sleep(POLITE_DELAY_SECONDS)
+
+    raise last_exc or RuntimeError(f"Failed to fetch {url}")
 
 
 def normalize_target_date(raw_date: Optional[str]) -> str:
@@ -429,7 +447,13 @@ def crawl_bo_khoa_hoc_cong_nghe(
     results: list[dict[str, Optional[str]]] = []
     seen_urls: set[str] = set()
 
-    html = fetch_html(session, date_page_url)
+    try:
+        html = fetch_html(session, date_page_url)
+    except Exception as exc:
+        logging.warning("Failed date page %s: %s", date_page_url, exc)
+        logging.info("Finished. Parsed 0 articles.")
+        return results
+
     article_urls = extract_article_links(html, date_page_url)
     logging.info("Found %d candidate article links", len(article_urls))
 
