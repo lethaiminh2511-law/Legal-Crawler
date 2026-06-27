@@ -7,48 +7,27 @@ from typing import List, Dict
 from dotenv import load_dotenv
 load_dotenv()
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "1141777845693322")
-TO_PHONE = os.getenv("WHATSAPP_TO_PHONE", "84914230081")
+WHATSAPP_API_KEY = os.getenv("WHATSAPP_API_KEY")
+CHANNEL_ID = "120363409024011943@newsletter"
 
 GRAPH_API_VERSION = "v25.0"
 
 
 def send_whatsapp_text(message: str) -> dict:
-    """
-    Gửi text message qua WhatsApp Cloud API.
-    Lưu ý: text message chỉ gửi được nếu số nhận đang trong 24h customer service window.
-    Nếu gửi chủ động lần đầu, cần dùng template đã được approve.
-    """
 
-    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{PHONE_NUMBER_ID}/messages"
-
+    url = "http://localhost:3000/api/sendText"
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "X-Api-Key": WHATSAPP_API_KEY,
         "Content-Type": "application/json",
     }
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": TO_PHONE,
-        "type": "text",
-        "text": {
-            "preview_url": True,
-            "body": message,
-        },
+    data = {
+        "session": "default",
+        "chatId": CHANNEL_ID,
+        "text": message
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-
-    try:
-        data = response.json()
-    except Exception:
-        data = {"raw_response": response.text}
-
-    if not response.ok:
-        raise RuntimeError(f"Failed to send WhatsApp message: {response.status_code} - {data}")
-
-    return data
+    response = requests.post(url, json=data, headers=headers)
+    print(response.json())
 
 
 def format_crawled_items(items: List[Dict]) -> str:
@@ -75,7 +54,7 @@ def format_crawled_items(items: List[Dict]) -> str:
             f"📝 *Tóm tắt*\n"
             f"{summary}\n\n"
             f"🔗 *Chi tiết:*\n{url}\n"
-            f"{'─' * 20}\n"
+            f"{'─' * 10}\n"
         )
 
     return "\n".join(lines)
