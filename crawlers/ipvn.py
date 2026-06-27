@@ -405,6 +405,27 @@ def is_older_than_window(published_at: Optional[str], days: Optional[int]) -> bo
     return parsed.date() < start_date
 
 
+def get_oldest_article_date(articles: list[ParsedArticle]) -> Optional[datetime]:
+    parsed_dates = [
+        parsed
+        for parsed in (try_parse_datetime(article.published_at) for article in articles)
+        if parsed is not None
+    ]
+
+    if not parsed_dates:
+        return None
+
+    return min(parsed_dates)
+
+
+def should_stop_after_page(articles: list[ParsedArticle], days: Optional[int]) -> bool:
+    oldest_date = get_oldest_article_date(articles)
+    if not oldest_date:
+        return False
+
+    return is_older_than_window(oldest_date.strftime("%Y-%m-%d %H:%M"), days)
+
+
 def article_to_json_dict(article: ParsedArticle) -> dict:
     return {
         "title": article.title,
@@ -477,7 +498,7 @@ def crawl_ipvn(
                     logging.info("No articles found for prefix=%s page_no=%s", prefix, page_no)
                     break
 
-                should_stop = False
+                page_articles: list[ParsedArticle] = []
 
                 for listing_article in listing_articles:
                     if len(results) >= max_articles:
@@ -497,14 +518,11 @@ def crawl_ipvn(
                         except Exception as exc:
                             logging.warning("Failed to fetch detail %s: %s", listing_article.url, exc)
 
+                    page_articles.append(article)
+
                     if not article.title:
                         logging.info("Skip article without title: %s", listing_article.url)
                         continue
-
-                    if is_older_than_window(article.published_at, days):
-                        logging.info("Stop at old article date: %s", article.title)
-                        should_stop = True
-                        break
 
                     if not is_within_days(article.published_at, days):
                         logging.info("Skip old article: %s", article.title)
@@ -520,7 +538,13 @@ def crawl_ipvn(
 
                     results.append(article_to_json_dict(article))
 
-                if should_stop:
+                if should_stop_after_page(page_articles, days):
+                    oldest_date = get_oldest_article_date(page_articles)
+                    logging.info(
+                        "Skip next page because page_no=%s oldest date is %s",
+                        page_no,
+                        oldest_date.strftime("%Y-%m-%d %H:%M") if oldest_date else None,
+                    )
                     break
 
                 time.sleep(POLITE_DELAY_SECONDS)

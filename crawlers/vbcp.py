@@ -118,6 +118,23 @@ def is_within_days(published_at: Optional[str], days: Optional[int]) -> bool:
     return parsed >= cutoff
 
 
+def get_cutoff_datetime(days: Optional[int]) -> Optional[datetime]:
+    if days is None:
+        return None
+    return datetime.now(VN_TZ) - timedelta(days=days)
+
+
+def get_oldest_document_datetime(documents: list[ParsedDocument]) -> Optional[datetime]:
+    parsed_dates = [
+        parsed
+        for document in documents
+        if (parsed := try_parse_datetime(document.published_at or document.issued_date))
+    ]
+    if not parsed_dates:
+        return None
+    return min(parsed_dates)
+
+
 def fetch_html(session: requests.Session, url: str, **kwargs: object) -> str:
     response = session.request("GET", url, headers=HEADERS, timeout=REQUEST_TIMEOUT, **kwargs)
     response.raise_for_status()
@@ -350,6 +367,7 @@ def crawl_vbcp(
 
     results: list[dict[str, object]] = []
     seen_urls: set[str] = set()
+    cutoff = get_cutoff_datetime(days)
 
     current_html = fetch_html(session, ALL_DOCUMENTS_URL)
 
@@ -372,6 +390,7 @@ def crawl_vbcp(
             break
 
         logging.info("Found %d documents on page=%s", len(documents), page_no)
+        oldest_page_date = get_oldest_document_datetime(documents)
 
         added_from_page = 0
         for document in documents:
@@ -400,6 +419,15 @@ def crawl_vbcp(
             added_from_page += 1
 
         time.sleep(POLITE_DELAY_SECONDS)
+
+        if cutoff and oldest_page_date and oldest_page_date < cutoff:
+            logging.info(
+                "Oldest document on page=%s is %s, before cutoff %s; stop pagination",
+                page_no,
+                oldest_page_date.strftime("%Y-%m-%d %H:%M"),
+                cutoff.strftime("%Y-%m-%d %H:%M"),
+            )
+            break
 
         if added_from_page == 0:
             logging.info("No new documents added from page=%s; stop pagination", page_no)

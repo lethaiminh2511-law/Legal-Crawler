@@ -218,6 +218,12 @@ def normalize_api_date(raw_date: Optional[str]) -> str:
     raise ValueError("Date must be dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, or yyyy/mm/dd")
 
 
+def parse_api_date(raw_date: str) -> Optional[datetime.date]:
+    if not raw_date:
+        return None
+    return datetime.strptime(raw_date, "%d/%m/%Y").date()
+
+
 def get_date_range(days: Optional[int]) -> tuple[str, str]:
     if days is None:
         return "", ""
@@ -290,6 +296,21 @@ def parse_article_record(record: dict[str, Any]) -> ParsedArticle:
         published_at=format_datetime(record.get("ngaySua")),
         summary_raw=build_summary(record),
     )
+
+
+def get_record_datetime(record: dict[str, Any]) -> Optional[datetime]:
+    for key in ["ngaySua", "ngayTao", "ngayLayYKien"]:
+        parsed = try_parse_datetime(record.get(key))
+        if parsed:
+            return parsed
+    return None
+
+
+def get_furthest_page_date(records: list[dict[str, Any]]) -> Optional[datetime.date]:
+    dates = [dt.date() for record in records if (dt := get_record_datetime(record))]
+    if not dates:
+        return None
+    return min(dates)
 
 
 def keyword_hits(text: str, keywords: list[str]) -> list[str]:
@@ -397,6 +418,7 @@ def crawl_vbdt_hcm(
         api_date_to = normalize_api_date(date_to)
     else:
         api_date_from, api_date_to = get_date_range(days)
+    start_date = parse_api_date(api_date_from)
 
     session = requests.Session()
     session.headers.update(HEADERS)
@@ -432,6 +454,8 @@ def crawl_vbdt_hcm(
                 logging.info("No records found at offset=%s", offset)
                 break
 
+            furthest_page_date = get_furthest_page_date(records)
+
             for record in records:
                 if len(results) >= max_articles:
                     break
@@ -457,6 +481,14 @@ def crawl_vbdt_hcm(
                 results.append(article_to_json_dict(article))
 
             time.sleep(POLITE_DELAY_SECONDS)
+
+            if start_date and furthest_page_date and furthest_page_date < start_date:
+                logging.info(
+                    "Stop before next page because furthest page date %s is older than start date %s",
+                    furthest_page_date,
+                    start_date,
+                )
+                break
 
             if len(records) < page_size:
                 break
