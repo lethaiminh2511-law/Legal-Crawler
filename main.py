@@ -69,9 +69,5 @@ def run_whatsapp_sender():
 
 if __name__ == "__main__":
     success = run_crawlers()
-
-    # Only send WhatsApp message if all crawlers succeeded
-    if success:
-        run_whatsapp_sender()
-    else:
-        print("\n⛔ Skip WhatsApp sender because some crawlers failed.")
+    print("\n⛔ Some crawlers failed.")
+    run_whatsapp_sender()
