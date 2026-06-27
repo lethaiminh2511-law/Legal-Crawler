@@ -5,17 +5,19 @@ import json
 import logging
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin, urlparse
-from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
 
-
-VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+from crawlers.common.dates import VN_TZ, try_parse_datetime
+from crawlers.common.http import fetch_html
+from crawlers.common.io import write_json
+from crawlers.common.keywords import is_relevant_text
+from crawlers.common.models import ParsedArticle, article_to_json_dict
+from crawlers.common.text import clean_text
 
 SOURCE_NAME = "Cổng Thông tin điện tử Bộ Khoa học và Công nghệ"
 BASE_SITE_URL = "https://mst.gov.vn/"
@@ -123,54 +125,6 @@ TOPIC_KEYWORDS = [
 ]
 
 
-@dataclass
-class ParsedArticle:
-    title: str
-    url: str
-    source: str
-    published_at: Optional[str]
-    summary_raw: str
-
-
-def clean_text(text: Optional[str]) -> str:
-    if not text:
-        return ""
-    text = text.replace("\xa0", " ")
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def normalize_for_search(text: str) -> str:
-    return clean_text(text).lower()
-
-
-def fetch_html(session: requests.Session, url: str) -> str:
-    last_exc: Optional[Exception] = None
-
-    for attempt in range(1, FETCH_RETRIES + 1):
-        try:
-            response = session.get(url, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-
-            if not response.encoding or response.encoding.lower() == "iso-8859-1":
-                response.encoding = response.apparent_encoding
-
-            return response.text
-        except requests.RequestException as exc:
-            last_exc = exc
-            if attempt < FETCH_RETRIES:
-                logging.warning(
-                    "Fetch failed attempt %s/%s for %s: %s",
-                    attempt,
-                    FETCH_RETRIES,
-                    url,
-                    exc,
-                )
-                time.sleep(POLITE_DELAY_SECONDS)
-
-    raise last_exc or RuntimeError(f"Failed to fetch {url}")
-
-
 def normalize_target_date(raw_date: Optional[str]) -> str:
     if not raw_date:
         return datetime.now(VN_TZ).strftime("%d-%m-%Y")
@@ -259,42 +213,6 @@ def extract_title(soup: BeautifulSoup) -> str:
     return ""
 
 
-def try_parse_datetime(raw: Optional[str]) -> Optional[datetime]:
-    raw = clean_text(raw)
-    if not raw:
-        return None
-
-    if raw.endswith("Z"):
-        raw = raw[:-1] + "+0000"
-
-    candidates = [
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y %H:%M",
-        "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%dT%H:%M:%S.%f%z",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%f",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%d/%m/%Y",
-        "%d-%m-%Y",
-        "%Y-%m-%d",
-    ]
-
-    for fmt in candidates:
-        try:
-            dt = datetime.strptime(raw, fmt)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=VN_TZ)
-            return dt.astimezone(VN_TZ)
-        except ValueError:
-            continue
-
-    return None
-
-
 def extract_published_at(soup: BeautifulSoup) -> Optional[str]:
     meta_date = extract_meta_content(
         soup,
@@ -370,35 +288,19 @@ def parse_article(html: str, url: str) -> ParsedArticle:
     )
 
 
-def keyword_hits(text: str, keywords: list[str]) -> list[str]:
-    haystack = normalize_for_search(text)
-    hits = []
-
-    for keyword in keywords:
-        kw = normalize_for_search(keyword)
-        if kw and kw in haystack:
-            hits.append(keyword)
-
-    return sorted(set(hits))
-
-
 def is_relevant_article(
     article: ParsedArticle,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
 ) -> bool:
     searchable_text = " ".join([article.title, article.summary_raw])
-
-    legal_hits = keyword_hits(searchable_text, LEGAL_KEYWORDS)
-    topic_hits = keyword_hits(searchable_text, TOPIC_KEYWORDS)
-
-    if require_legal_keyword and not legal_hits:
-        return False
-
-    if require_topic_keyword and not topic_hits:
-        return False
-
-    return True
+    return is_relevant_text(
+        searchable_text,
+        legal_keywords=LEGAL_KEYWORDS,
+        topic_keywords=TOPIC_KEYWORDS,
+        require_legal_keyword=require_legal_keyword,
+        require_topic_keyword=require_topic_keyword,
+    )
 
 
 def is_on_target_date(published_at: Optional[str], target_date: str) -> bool:
@@ -412,16 +314,6 @@ def is_on_target_date(published_at: Optional[str], target_date: str) -> bool:
 
     target = datetime.strptime(normalize_target_date(target_date), "%d-%m-%Y").date()
     return parsed.date() == target
-
-
-def article_to_json_dict(article: ParsedArticle) -> dict[str, Optional[str]]:
-    return {
-        "title": article.title,
-        "url": article.url,
-        "source": article.source,
-        "published_at": article.published_at,
-        "summary_raw": article.summary_raw,
-    }
 
 
 def crawl_bo_khoa_hoc_cong_nghe(
@@ -448,7 +340,13 @@ def crawl_bo_khoa_hoc_cong_nghe(
     seen_urls: set[str] = set()
 
     try:
-        html = fetch_html(session, date_page_url)
+        html = fetch_html(
+            session,
+            date_page_url,
+            timeout=REQUEST_TIMEOUT,
+            retries=FETCH_RETRIES,
+            delay_seconds=POLITE_DELAY_SECONDS,
+        )
     except Exception as exc:
         logging.warning("Failed date page %s: %s", date_page_url, exc)
         logging.info("Finished. Parsed 0 articles.")
@@ -467,7 +365,13 @@ def crawl_bo_khoa_hoc_cong_nghe(
 
         try:
             logging.info("Fetching article: %s", article_url)
-            article_html = fetch_html(session, article_url)
+            article_html = fetch_html(
+                session,
+                article_url,
+                timeout=REQUEST_TIMEOUT,
+                retries=FETCH_RETRIES,
+                delay_seconds=POLITE_DELAY_SECONDS,
+            )
             article = parse_article(article_html, article_url)
 
             if not article.title:
@@ -543,8 +447,7 @@ def main() -> None:
         require_topic_keyword=True,
     )
 
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(articles, f, ensure_ascii=False, indent=2)
+    write_json(articles, args.output)
 
     if args.pretty:
         print(json.dumps(articles, ensure_ascii=False, indent=2))
