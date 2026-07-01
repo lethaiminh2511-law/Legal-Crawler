@@ -15,6 +15,7 @@ import requests
 import urllib3
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -41,55 +42,6 @@ POLITE_DELAY_SECONDS = 0.8
 
 # The site currently serves a certificate chain that may fail local verification.
 DEFAULT_VERIFY_SSL = False
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "sửa đổi",
-    "bổ sung",
-    "quy định chi tiết",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "quy chuẩn",
-    "tiêu chuẩn",
-]
-
-TOPIC_KEYWORDS = [
-    "dữ liệu",
-    "dữ liệu cá nhân",
-    "an toàn thông tin",
-    "an ninh mạng",
-    "trí tuệ nhân tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "nền tảng số",
-    "dịch vụ số",
-    "mạng xã hội",
-    "phần mềm",
-    "thương mại điện tử",
-    "giao dịch điện tử",
-    "hợp đồng điện tử",
-    "chữ ký điện tử",
-    "thanh toán điện tử",
-    "quảng cáo trực tuyến",
-    "sở hữu trí tuệ",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "hàng giả",
-]
 
 
 @dataclass

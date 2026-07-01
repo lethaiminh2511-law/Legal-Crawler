@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -43,75 +44,6 @@ HEADERS = {
     ),
     "x-requested-with": "XMLHttpRequest",
 }
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "sửa đổi, bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "hậu kiểm",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-]
-
-TOPIC_KEYWORDS = [
-    "dữ liệu",
-    "dữ liệu cá nhân",
-    "an toàn thông tin",
-    "an ninh mạng",
-    "trí tuệ nhân tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "nền tảng số",
-    "dịch vụ số",
-    "phần mềm",
-    "thương mại điện tử",
-    "giao dịch điện tử",
-    "hợp đồng điện tử",
-    "chữ ký điện tử",
-    "chữ ký số",
-    "thanh toán điện tử",
-    "sở hữu trí tuệ",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "hàng giả",
-    "hàng hóa giả mạo",
-    "đô thị thông minh",
-    "dịch vụ công trực tuyến",
-    "cải cách hành chính",
-]
 
 
 @dataclass

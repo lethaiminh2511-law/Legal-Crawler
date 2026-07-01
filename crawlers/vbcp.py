@@ -17,7 +17,6 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 SOURCE_NAME = "Cổng Thông tin điện tử Chính phủ - Hệ thống văn bản"

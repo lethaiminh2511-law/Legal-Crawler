@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS, normalize_for_search
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -45,99 +46,6 @@ REQUEST_TIMEOUT = 25
 POLITE_DELAY_SECONDS = 0.8
 
 
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "sửa đổi, bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "hậu kiểm",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-    "kết luận sơ bộ",
-    "kết luận cuối cùng",
-    "điều tra",
-    "tự vệ",
-    "chống bán phá giá",
-    "chống trợ cấp",
-    "phòng vệ thương mại",
-]
-
-TOPIC_KEYWORDS = [
-    "dữ liệu",
-    "dữ liệu cá nhân",
-    "an toàn thông tin",
-    "an ninh mạng",
-    "trí tuệ nhân tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "nền tảng số",
-    "dịch vụ số",
-    "mạng xã hội",
-    "phần mềm",
-    "thương mại điện tử",
-    "sàn giao dịch thương mại điện tử",
-    "website thương mại điện tử",
-    "giao dịch điện tử",
-    "hợp đồng điện tử",
-    "chữ ký điện tử",
-    "chữ ký số",
-    "thanh toán điện tử",
-    "quảng cáo trực tuyến",
-    "sở hữu trí tuệ",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "hàng giả",
-    "hàng hóa giả mạo",
-    "điện lực",
-    "năng lượng",
-    "xăng dầu",
-    "khí",
-    "lpg",
-    "hóa chất",
-    "công nghiệp",
-    "thương mại",
-    "xuất khẩu",
-    "nhập khẩu",
-    "phòng vệ thương mại",
-    "chống bán phá giá",
-    "chống trợ cấp",
-    "tự vệ",
-    "quản lý thị trường",
-    "bảo vệ quyền lợi người tiêu dùng",
-]
-
-
 @dataclass
 class ParsedArticle:
     title: str
@@ -153,10 +61,6 @@ def clean_text(text: Optional[str]) -> str:
     text = text.replace("\xa0", " ")
     text = re.sub(r"\s+", " ", text)
     return text.strip()
-
-
-def normalize_for_search(text: str) -> str:
-    return clean_text(text).lower()
 
 
 def fetch_html(session: requests.Session, url: str) -> str:

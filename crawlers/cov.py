@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -35,94 +36,6 @@ HEADERS = {
 
 REQUEST_TIMEOUT = 20
 POLITE_DELAY_SECONDS = 0.8
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "sửa đổi, bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "hậu kiểm",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-]
-
-TOPIC_KEYWORDS = [
-    "bản quyền",
-    "quyền tác giả",
-    "quyền liên quan",
-    "sở hữu trí tuệ",
-    "quyền sở hữu trí tuệ",
-    "tác phẩm",
-    "tác phẩm số",
-    "nội dung số",
-    "sao chép tác phẩm",
-    "sử dụng tác phẩm",
-    "truyền đạt tác phẩm",
-    "phân phối tác phẩm",
-    "xâm phạm quyền tác giả",
-    "xâm phạm quyền liên quan",
-    "xâm phạm quyền sở hữu trí tuệ",
-    "thực thi quyền sở hữu trí tuệ",
-    "giám định quyền tác giả",
-    "đăng ký quyền tác giả",
-    "chủ sở hữu quyền",
-    "tiền bản quyền",
-    "cấp phép bản quyền",
-    "giấy phép sử dụng nội dung",
-    "ngoại lệ quyền tác giả",
-    "giới hạn quyền tác giả",
-    "biện pháp công nghệ",
-    "thông tin quản lý quyền",
-    "doanh nghiệp cung cấp dịch vụ trung gian",
-    "môi trường mạng",
-    "môi trường số",
-    "nền tảng số",
-    "nền tảng trực tuyến",
-    "dịch vụ trung gian",
-    "trí tuệ nhân tạo",
-    "ai",
-    "dữ liệu huấn luyện",
-    "nội dung do trí tuệ nhân tạo tạo ra",
-    "reup",
-    "livestream",
-    "phát sóng",
-    "bản ghi âm",
-    "bản ghi hình",
-    "cuộc biểu diễn",
-    "chương trình phát sóng",
-    "âm nhạc",
-    "điện ảnh",
-    "công nghiệp văn hóa",
-]
 
 
 @dataclass

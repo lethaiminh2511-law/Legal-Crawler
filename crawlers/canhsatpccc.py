@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -39,67 +40,6 @@ HEADERS = {
 
 REQUEST_TIMEOUT = 20
 POLITE_DELAY_SECONDS = 0.8
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-    "kết luận thanh tra",
-]
-
-TOPIC_KEYWORDS = [
-    "phòng cháy",
-    "chữa cháy",
-    "pccc",
-    "cứu nạn",
-    "cứu hộ",
-    "cnch",
-    "cháy, nổ",
-    "phòng nổ",
-    "thoát nạn",
-    "an toàn cháy",
-    "an toàn phòng cháy",
-    "phương tiện pccc",
-    "thiết bị pccc",
-    "kiểm định phương tiện",
-    "cơ sở sản xuất",
-    "khu công nghiệp",
-    "nhà ở kết hợp kinh doanh",
-    "công trình",
-    "quản lý nhà nước",
-    "cải cách hành chính",
-]
 
 
 @dataclass

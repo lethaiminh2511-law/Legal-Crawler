@@ -15,6 +15,7 @@ import requests
 import urllib3
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -52,72 +53,6 @@ HEADERS = {
 
 REQUEST_TIMEOUT = 25
 POLITE_DELAY_SECONDS = 0.8
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "sửa đổi, bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "hậu kiểm",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-]
-
-TOPIC_KEYWORDS = [
-    "sở hữu trí tuệ",
-    "quyền sở hữu trí tuệ",
-    "sở hữu công nghiệp",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "giải pháp hữu ích",
-    "kiểu dáng công nghiệp",
-    "bí mật kinh doanh",
-    "chỉ dẫn địa lý",
-    "giống cây trồng",
-    "đơn đăng ký sở hữu công nghiệp",
-    "hàng giả",
-    "hàng hóa giả mạo nhãn hiệu",
-    "thực thi quyền sở hữu trí tuệ",
-    "giám định sở hữu trí tuệ",
-    "đổi mới sáng tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "trí tuệ nhân tạo",
-    "dữ liệu",
-    "dữ liệu cá nhân",
-]
 
 
 @dataclass

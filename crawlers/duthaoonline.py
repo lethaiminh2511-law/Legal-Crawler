@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -46,66 +47,6 @@ AJAX_HEADERS = {
     "accept": "text/html,*/*;q=0.8",
     "x-requested-with": "XMLHttpRequest",
 }
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách",
-]
-
-TOPIC_KEYWORDS = [
-    "dữ liệu",
-    "dữ liệu cá nhân",
-    "an toàn thông tin",
-    "an ninh mạng",
-    "trí tuệ nhân tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "nền tảng số",
-    "dịch vụ số",
-    "mạng xã hội",
-    "phần mềm",
-    "thương mại điện tử",
-    "giao dịch điện tử",
-    "hợp đồng điện tử",
-    "chữ ký điện tử",
-    "thanh toán điện tử",
-    "quảng cáo trực tuyến",
-    "sở hữu trí tuệ",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "hàng giả",
-    "tiêu chuẩn",
-    "đo lường",
-]
 
 
 @dataclass(frozen=True)

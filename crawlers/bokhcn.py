@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from crawlers.common.dates import VN_TZ, try_parse_datetime
 from crawlers.common.http import fetch_html
 from crawlers.common.io import write_json
-from crawlers.common.keywords import is_relevant_text
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS, is_relevant_text
 from crawlers.common.models import ParsedArticle, article_to_json_dict
 from crawlers.common.text import clean_text
 
@@ -47,82 +47,6 @@ HEADERS = {
 REQUEST_TIMEOUT = 25
 FETCH_RETRIES = 2
 POLITE_DELAY_SECONDS = 0.8
-
-
-LEGAL_KEYWORDS = [
-    "dự thảo",
-    "lấy ý kiến",
-    "góp ý dự thảo",
-    "nghị định",
-    "thông tư",
-    "quyết định",
-    "nghị quyết",
-    "chỉ thị",
-    "luật",
-    "pháp lệnh",
-    "ban hành",
-    "có hiệu lực",
-    "sửa đổi",
-    "bổ sung",
-    "sửa đổi, bổ sung",
-    "thay thế",
-    "bãi bỏ",
-    "hướng dẫn thi hành",
-    "quy định chi tiết",
-    "xử phạt",
-    "vi phạm hành chính",
-    "thủ tục hành chính",
-    "điều kiện kinh doanh",
-    "giấy phép",
-    "cấp phép",
-    "đăng ký",
-    "thông báo",
-    "báo cáo",
-    "kiểm tra",
-    "thanh tra",
-    "hậu kiểm",
-    "quy chuẩn",
-    "tiêu chuẩn",
-    "quy chế",
-    "chính sách mới",
-]
-
-TOPIC_KEYWORDS = [
-    "dữ liệu",
-    "dữ liệu cá nhân",
-    "an toàn thông tin",
-    "an ninh mạng",
-    "trí tuệ nhân tạo",
-    "chuyển đổi số",
-    "kinh tế số",
-    "công nghệ số",
-    "công nghệ cao",
-    "công nghệ chiến lược",
-    "công nghệ mới",
-    "nền tảng số",
-    "dịch vụ số",
-    "phần mềm",
-    "thương mại điện tử",
-    "giao dịch điện tử",
-    "hợp đồng điện tử",
-    "chữ ký điện tử",
-    "chữ ký số",
-    "sở hữu trí tuệ",
-    "quyền sở hữu trí tuệ",
-    "quyền tác giả",
-    "bản quyền",
-    "nhãn hiệu",
-    "sáng chế",
-    "kiểu dáng công nghiệp",
-    "bí mật kinh doanh",
-    "chỉ dẫn địa lý",
-    "giống cây trồng",
-    "tiêu chuẩn đo lường chất lượng",
-    "tiêu chuẩn",
-    "quy chuẩn kỹ thuật",
-    "đổi mới sáng tạo",
-    "nghiên cứu khoa học",
-]
 
 
 def normalize_target_date(raw_date: Optional[str]) -> str:
