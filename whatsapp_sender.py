@@ -129,11 +129,11 @@ def format_crawled_items(items: List[Dict]) -> str:
     lines = ["Legal Crawler - Có thông tin mới:\n"]
 
     for idx, item in enumerate(items, start=1):
-        title = item.get("title", "").strip()
-        source = item.get("source", "").strip()
-        published_at = item.get("published_at", "").strip()
-        summary = item.get("summary_raw", "").strip()
-        url = item.get("url", "").strip()
+        title = (item.get("title", "") or "").strip()
+        source = (item.get("source", "") or "").strip()
+        published_at = (item.get("published_at", "") or "").strip()
+        summary = (item.get("summary_raw", "") or "").strip()
+        url = (item.get("url", "") or "").strip()
 
         lines.append(
             f"📰 *{title}*\n\n"

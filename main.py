@@ -1,6 +1,7 @@
 import sys
 import subprocess
 from pathlib import Path
+import traceback
 
 
 def run_crawlers():
@@ -38,6 +39,7 @@ def run_crawlers():
         except subprocess.CalledProcessError as e:
             print(f"❌ Failed: {crawler_file.name}")
             print(f"   Exit code: {e.returncode}\n")
+            traceback.print_exc()
             failed.append(crawler_file.name)
 
     print("=" * 50)
@@ -69,6 +71,7 @@ def run_whatsapp_sender():
         print("✅ WhatsApp sender completed.")
 
     except subprocess.CalledProcessError as e:
+        traceback.print_exc()
         print(f"❌ WhatsApp sender failed (exit code {e.returncode})")
 
 
