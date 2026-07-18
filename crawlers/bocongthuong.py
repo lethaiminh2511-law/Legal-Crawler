@@ -505,11 +505,6 @@ def main() -> None:
         help="parentId truyền vào endpoint. Mặc định: 101788658 (/tin-tuc).",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài tìm được.",
-    )
-    parser.add_argument(
         "--no-detail",
         action="store_true",
         help="Không fetch từng trang chi tiết; chỉ dùng dữ liệu listing.",
@@ -540,7 +535,7 @@ def main() -> None:
         max_pages=args.max_pages,
         category_id=args.category_id,
         parent_id=args.parent_id,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
         fetch_details=not args.no_detail,

@@ -485,11 +485,6 @@ def main() -> None:
         help="Cookie lấy từ browser/curl. Nếu cookie default hết hạn thì paste cookie mới vào đây.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài từ 3 category_id.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="bocongan_articles.json",
@@ -516,7 +511,7 @@ def main() -> None:
         max_pages_per_category=args.max_pages_per_category,
         date_from=args.date_from,
         date_to=args.date_to,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
         cookie=args.cookie,

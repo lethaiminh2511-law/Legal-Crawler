@@ -585,11 +585,6 @@ def main() -> None:
         help="So page toi da cho moi prefix. Mac dinh: 5.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Khong loc keyword; lay tat ca bai tim duoc.",
-    )
-    parser.add_argument(
         "--no-detail",
         action="store_true",
         help="Khong fetch tung trang chi tiet; chi dung du lieu listing.",
@@ -618,7 +613,7 @@ def main() -> None:
         days=None if args.days == 0 else args.days,
         max_articles=args.max_articles,
         max_pages_per_prefix=args.max_pages_per_prefix,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
         fetch_details=not args.no_detail,

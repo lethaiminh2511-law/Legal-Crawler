@@ -522,11 +522,6 @@ def main() -> None:
         help="Số bài tối đa trả về. Mặc định: 50.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài tìm được từ category pages.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="cov_articles.json",
@@ -551,7 +546,7 @@ def main() -> None:
         max_pages=args.max_pages,
         days=None if args.days == 0 else args.days,
         max_articles=args.max_articles,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )

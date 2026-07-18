@@ -314,7 +314,7 @@ def keyword_hits(text: str, keywords: list[str]) -> list[str]:
 def is_relevant_article(
     article: ParsedArticle,
     require_legal_keyword: bool = True,
-    require_topic_keyword: bool = False,
+    require_topic_keyword: bool = True,
 ) -> bool:
     searchable_text = " ".join([article.title, article.summary_raw, article.document_type])
     legal_hits = keyword_hits(searchable_text, LEGAL_KEYWORDS)
@@ -383,7 +383,7 @@ def crawl_vibonline(
     max_pages: int = 10,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
-    require_topic_keyword: bool = False,
+    require_topic_keyword: bool = True,
     fetch_details: bool = True,
     verify_ssl: bool = DEFAULT_VERIFY_SSL,
 ) -> list[dict]:
@@ -518,16 +518,6 @@ def main() -> None:
         help="Số page tối đa cần crawl. Mặc định: 10.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả dự thảo trong khoảng ngày.",
-    )
-    parser.add_argument(
-        "--require-topic-keyword",
-        action="store_true",
-        help="Yêu cầu trúng keyword chủ đề công nghệ/IP như các crawler khác.",
-    )
-    parser.add_argument(
         "--no-details",
         action="store_true",
         help="Không fetch trang chi tiết; chỉ dùng dữ liệu ở listing.",
@@ -562,9 +552,9 @@ def main() -> None:
         date_to=args.date_to,
         max_articles=args.max_articles,
         max_pages=args.max_pages,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
-        require_topic_keyword=args.require_topic_keyword,
+        require_topic_keyword=True,
         fetch_details=not args.no_details,
         verify_ssl=args.verify_ssl,
     )

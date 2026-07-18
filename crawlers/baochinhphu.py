@@ -474,11 +474,6 @@ def main() -> None:
         help="Số bài tối đa trả về. Mặc định: 50.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài tìm được từ seed pages.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="baochinhphu_articles.json",
@@ -500,7 +495,7 @@ def main() -> None:
     articles = crawl_bao_chinh_phu(
         days=args.days,
         max_articles=args.max_articles,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )

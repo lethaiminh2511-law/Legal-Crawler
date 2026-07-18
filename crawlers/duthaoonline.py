@@ -328,7 +328,7 @@ def keyword_hits(text: str, keywords: list[str]) -> list[str]:
 def is_relevant_article(
     article: ParsedArticle,
     require_legal_keyword: bool = True,
-    require_topic_keyword: bool = False,
+    require_topic_keyword: bool = True,
 ) -> bool:
     searchable_text = " ".join(
         [
@@ -406,7 +406,7 @@ def crawl_duthaoonline(
     max_pages_per_source: int = 5,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
-    require_topic_keyword: bool = False,
+    require_topic_keyword: bool = True,
     source_keys: Optional[list[str]] = None,
 ) -> list[dict]:
     """
@@ -581,16 +581,6 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bản ghi trong khoảng ngày.",
-    )
-    parser.add_argument(
-        "--require-topic-keyword",
-        action="store_true",
-        help="Yêu cầu trúng keyword chủ đề công nghệ/IP như các crawler khác.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="duthaoonline_articles.json",
@@ -615,9 +605,9 @@ def main() -> None:
         date_to=args.date_to,
         max_articles=args.max_articles,
         max_pages_per_source=args.max_pages_per_source,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
-        require_topic_keyword=args.require_topic_keyword,
+        require_topic_keyword=True,
         source_keys=parse_source_keys(args.sources),
     )
 

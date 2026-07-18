@@ -17,6 +17,8 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from crawlers.common.keywords import LEGAL_KEYWORDS, TOPIC_KEYWORDS, is_relevant_text
+
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 SOURCE_NAME = "Cổng Thông tin điện tử Chính phủ - Hệ thống văn bản"
@@ -347,11 +349,37 @@ def document_to_json_dict(document: ParsedDocument) -> dict[str, object]:
     }
 
 
+def is_relevant_document(
+    document: ParsedDocument,
+    require_legal_keyword: bool = True,
+    require_topic_keyword: bool = True,
+) -> bool:
+    searchable_text = " ".join(
+        [
+            document.title,
+            document.summary_raw,
+            document.code,
+            document.document_type,
+            document.agency,
+        ]
+    )
+    return is_relevant_text(
+        searchable_text,
+        legal_keywords=LEGAL_KEYWORDS,
+        topic_keywords=TOPIC_KEYWORDS,
+        require_legal_keyword=require_legal_keyword,
+        require_topic_keyword=require_topic_keyword,
+    )
+
+
 def crawl_vbcp(
     days: Optional[int] = 1,
     max_articles: int = 50,
     max_pages: int = 1,
     fetch_details: bool = False,
+    filter_relevant: bool = True,
+    require_legal_keyword: bool = True,
+    require_topic_keyword: bool = True,
 ) -> list[dict[str, object]]:
     """
     Crawl "Tất cả văn bản" from vanban.chinhphu.vn.
@@ -413,6 +441,14 @@ def crawl_vbcp(
                     time.sleep(POLITE_DELAY_SECONDS)
                 except Exception as exc:
                     logging.warning("Failed to fetch detail %s: %s", document.url, exc)
+
+            if filter_relevant and not is_relevant_document(
+                document,
+                require_legal_keyword=require_legal_keyword,
+                require_topic_keyword=require_topic_keyword,
+            ):
+                logging.info("Skip non-relevant document: %s", document.title)
+                continue
 
             results.append(document_to_json_dict(document))
             added_from_page += 1
@@ -490,6 +526,9 @@ def main() -> None:
         max_articles=args.max_articles,
         max_pages=args.max_pages,
         fetch_details=args.fetch_details,
+        filter_relevant=True,
+        require_legal_keyword=True,
+        require_topic_keyword=True,
     )
 
     with open(args.output, "w", encoding="utf-8") as f:

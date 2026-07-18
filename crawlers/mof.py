@@ -489,11 +489,6 @@ def main() -> None:
         help="Số page tối đa cho mỗi category. Mặc định: 5.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài tìm được.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="mof_articles.json",
@@ -518,7 +513,7 @@ def main() -> None:
         max_articles=args.max_articles,
         items_per_page=args.items_per_page,
         max_pages_per_category=args.max_pages_per_category,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )

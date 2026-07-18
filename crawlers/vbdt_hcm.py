@@ -326,7 +326,7 @@ def crawl_vbdt_hcm(
     date_to: str = "",
     txt_search: str = "",
     trang_thai: str = "-1",
-    filter_relevant: bool = False,
+    filter_relevant: bool = True,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
 ) -> list[dict[str, Any]]:
@@ -486,11 +486,6 @@ def main() -> None:
         help="trangThai truyền vào API. Mặc định: -1.",
     )
     parser.add_argument(
-        "--filter-relevant",
-        action="store_true",
-        help="Bật lọc keyword pháp lý/chủ đề. Mặc định: tắt để lấy toàn bộ văn bản dự thảo.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="vbdt_hcm_articles.json",
@@ -518,7 +513,7 @@ def main() -> None:
         date_to=args.date_to,
         txt_search=args.txt_search,
         trang_thai=args.trang_thai,
-        filter_relevant=args.filter_relevant,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )

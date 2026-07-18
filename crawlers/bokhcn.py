@@ -243,7 +243,7 @@ def is_on_target_date(published_at: Optional[str], target_date: str) -> bool:
 def crawl_bo_khoa_hoc_cong_nghe(
     target_date: Optional[str] = None,
     max_articles: int = 50,
-    filter_relevant: bool = False,
+    filter_relevant: bool = True,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
 ) -> list[dict[str, Optional[str]]]:
@@ -340,11 +340,6 @@ def main() -> None:
         help="Số bài tối đa trả về. Mặc định: 50.",
     )
     parser.add_argument(
-        "--filter-relevant",
-        action="store_true",
-        help="Lọc keyword pháp lý/chủ đề giống các crawler legal tracking khác.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="bokhcn_articles.json",
@@ -366,7 +361,7 @@ def main() -> None:
     articles = crawl_bo_khoa_hoc_cong_nghe(
         target_date=args.date,
         max_articles=args.max_articles,
-        filter_relevant=args.filter_relevant,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )

@@ -513,11 +513,6 @@ def main() -> None:
         help="Số bài tối đa trả về. Mặc định: 50.",
     )
     parser.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Không lọc keyword; lấy tất cả bài tìm được từ seed pages.",
-    )
-    parser.add_argument(
         "--output",
         type=str,
         default="canhsatpccc_articles.json",
@@ -540,7 +535,7 @@ def main() -> None:
         seed_urls=parse_seed_urls(args.seed_urls),
         days=None if args.days == 0 else args.days,
         max_articles=args.max_articles,
-        filter_relevant=not args.no_filter,
+        filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
     )
