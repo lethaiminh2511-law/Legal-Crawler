@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -22,9 +23,16 @@ from crawlers.common.text import clean_text
 SOURCE_NAME = "Cổng Thông tin điện tử Bộ Khoa học và Công nghệ"
 BASE_SITE_URL = "https://mst.gov.vn/"
 DATE_PAGE_TEMPLATE = "https://mst.gov.vn/tin-tuc-su-kien/xem-theo-ngay-{date}.htm"
+TIMELINE_PAGE_TEMPLATE = "https://mst.gov.vn/timeline-van-ban/{category_id}/{page}.htm"
+TIMELINE_LEGAL_DOCUMENT_CATEGORY_IDS = ("100", "101", "2")
+DEFAULT_TIMELINE_MAX_PAGES = 10
 
 ARTICLE_URL_PATTERN = re.compile(
     r"/(?!tin-tuc-su-kien/xem-theo-ngay-)[^/?#]+-\d{6,}\.htm$",
+    re.IGNORECASE,
+)
+LEGAL_DOCUMENT_URL_PATTERN = re.compile(
+    r"^/van-ban-phap-luat/(?:du-thao/)?\d+\.htm$",
     re.IGNORECASE,
 )
 DATE_PATTERN = re.compile(
@@ -49,6 +57,21 @@ FETCH_RETRIES = 2
 POLITE_DELAY_SECONDS = 0.8
 
 
+@dataclass
+class ParsedLegalArticle(ParsedArticle):
+    code: str = ""
+    agency: str = ""
+    document_type: str = ""
+    field: str = ""
+    issued_date: str = ""
+
+
+@dataclass
+class TimelineArticleLinks:
+    urls: list[str]
+    has_document_links: bool = False
+
+
 def normalize_target_date(raw_date: Optional[str]) -> str:
     if not raw_date:
         return datetime.now(VN_TZ).strftime("%d-%m-%Y")
@@ -67,6 +90,10 @@ def build_date_page_url(target_date: str) -> str:
     return DATE_PAGE_TEMPLATE.format(date=normalize_target_date(target_date))
 
 
+def build_timeline_page_url(category_id: str, page: int) -> str:
+    return TIMELINE_PAGE_TEMPLATE.format(category_id=category_id, page=page)
+
+
 def is_bokhcn_url(url: str) -> bool:
     parsed = urlparse(url)
     return parsed.netloc.endswith("mst.gov.vn")
@@ -76,7 +103,10 @@ def is_article_url(url: str) -> bool:
     parsed = urlparse(url)
     if not is_bokhcn_url(url):
         return False
-    return bool(ARTICLE_URL_PATTERN.search(parsed.path))
+    return bool(
+        ARTICLE_URL_PATTERN.search(parsed.path)
+        or LEGAL_DOCUMENT_URL_PATTERN.match(parsed.path)
+    )
 
 
 def extract_article_links(html: str, page_url: str) -> list[str]:
@@ -98,6 +128,55 @@ def extract_article_links(html: str, page_url: str) -> list[str]:
             unique_links.append(link)
 
     return unique_links
+
+
+def find_nearest_date_text(node: BeautifulSoup) -> str:
+    for candidate in [node, *node.parents]:
+        if getattr(candidate, "name", None) == "[document]":
+            break
+
+        text = clean_text(candidate.get_text(" "))
+        match = DATE_PATTERN.search(text)
+        if match:
+            return f"{match.group(1)} {match.group(2) or '00:00'}"
+
+    return ""
+
+
+def extract_timeline_article_links(
+    html: str,
+    page_url: str,
+    target_date: str,
+) -> TimelineArticleLinks:
+    soup = BeautifulSoup(html, "html.parser")
+    links: list[str] = []
+    has_document_links = False
+
+    for tag in soup.find_all("a", href=True):
+        href = clean_text(tag.get("href"))
+        absolute_url = urljoin(page_url, href).split("#")[0].split("?")[0].strip()
+
+        if not LEGAL_DOCUMENT_URL_PATTERN.match(urlparse(absolute_url).path):
+            continue
+
+        has_document_links = True
+        date_text = find_nearest_date_text(tag)
+        if not date_text or not is_on_target_date(date_text, target_date):
+            continue
+
+        links.append(absolute_url)
+
+    seen = set()
+    unique_links = []
+    for link in links:
+        if link not in seen:
+            seen.add(link)
+            unique_links.append(link)
+
+    return TimelineArticleLinks(
+        urls=unique_links,
+        has_document_links=has_document_links,
+    )
 
 
 def extract_meta_content(soup: BeautifulSoup, *selectors: tuple[str, str]) -> str:
@@ -137,6 +216,35 @@ def extract_title(soup: BeautifulSoup) -> str:
     return ""
 
 
+def extract_labeled_value(soup: BeautifulSoup, label: str) -> str:
+    normalized_label = clean_text(label).lower()
+
+    for node in soup.find_all(["dt", "td", "th", "label", "span", "div"]):
+        node_text = clean_text(node.get_text(" "))
+        if node_text.lower() != normalized_label:
+            continue
+
+        next_node = node.find_next_sibling(["dd", "td", "div", "span"])
+        if next_node:
+            value = clean_text(next_node.get_text(" "))
+            if value:
+                return value
+
+    page_text = clean_text(soup.get_text(" "))
+    pattern = re.compile(
+        rf"{re.escape(label)}\s*:?\s*(.+?)(?=\s+(?:Số hiệu|Số / Ký hiệu|"
+        r"Cơ quan ban hành|Hình thức văn bản|Lĩnh vực|Trích yếu nội dung|"
+        r"Trích yếu|Ngày ban hành|Ngày có hiệu lực|Ngày hết hiệu lực|"
+        r"Người ký duyệt|Người ký|Tài liệu đính kèm)\b|$)",
+        re.IGNORECASE,
+    )
+    match = pattern.search(page_text)
+    if match:
+        return clean_text(match.group(1))
+
+    return ""
+
+
 def extract_published_at(soup: BeautifulSoup) -> Optional[str]:
     meta_date = extract_meta_content(
         soup,
@@ -148,6 +256,14 @@ def extract_published_at(soup: BeautifulSoup) -> Optional[str]:
     parsed = try_parse_datetime(meta_date)
     if parsed:
         return parsed.strftime("%Y-%m-%d %H:%M")
+
+    labeled_issued_date = extract_labeled_value(soup, "Ngày ban hành")
+    match = DATE_PATTERN.search(labeled_issued_date)
+    if match:
+        raw = f"{match.group(1)} {match.group(2) or '00:00'}"
+        parsed = try_parse_datetime(raw)
+        if parsed:
+            return parsed.strftime("%Y-%m-%d %H:%M")
 
     time_tag = soup.find("time")
     if time_tag:
@@ -182,6 +298,11 @@ def extract_published_at(soup: BeautifulSoup) -> Optional[str]:
 
 
 def extract_summary(soup: BeautifulSoup) -> str:
+    for label in ["Trích yếu nội dung", "Trích yếu", "Tóm tắt"]:
+        value = extract_labeled_value(soup, label)
+        if value:
+            return value
+
     meta_description = extract_meta_content(
         soup,
         ("name", "description"),
@@ -203,13 +324,41 @@ def extract_summary(soup: BeautifulSoup) -> str:
 def parse_article(html: str, url: str) -> ParsedArticle:
     soup = BeautifulSoup(html, "html.parser")
 
-    return ParsedArticle(
+    code = extract_labeled_value(soup, "Số hiệu") or extract_labeled_value(
+        soup,
+        "Số / Ký hiệu",
+    )
+    agency = extract_labeled_value(soup, "Cơ quan ban hành")
+    document_type = extract_labeled_value(soup, "Hình thức văn bản")
+    field = extract_labeled_value(soup, "Lĩnh vực")
+    issued_date = extract_labeled_value(soup, "Ngày ban hành")
+
+    return ParsedLegalArticle(
         title=extract_title(soup),
         url=url,
         source=SOURCE_NAME,
         published_at=extract_published_at(soup),
         summary_raw=extract_summary(soup),
+        code=code,
+        agency=agency,
+        document_type=document_type,
+        field=field,
+        issued_date=issued_date,
     )
+
+
+def legal_article_to_json_dict(article: ParsedArticle) -> dict[str, Optional[str]]:
+    output = article_to_json_dict(article)
+    output.update(
+        {
+            "code": getattr(article, "code", ""),
+            "agency": getattr(article, "agency", ""),
+            "document_type": getattr(article, "document_type", ""),
+            "field": getattr(article, "field", ""),
+            "issued_date": getattr(article, "issued_date", ""),
+        }
+    )
+    return output
 
 
 def is_relevant_article(
@@ -217,7 +366,16 @@ def is_relevant_article(
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
 ) -> bool:
-    searchable_text = " ".join([article.title, article.summary_raw])
+    searchable_text = " ".join(
+        [
+            article.title,
+            article.summary_raw,
+            getattr(article, "code", ""),
+            getattr(article, "agency", ""),
+            getattr(article, "document_type", ""),
+            getattr(article, "field", ""),
+        ]
+    )
     return is_relevant_text(
         searchable_text,
         legal_keywords=LEGAL_KEYWORDS,
@@ -240,12 +398,95 @@ def is_on_target_date(published_at: Optional[str], target_date: str) -> bool:
     return parsed.date() == target
 
 
+def is_before_target_date(raw_date: Optional[str], target_date: str) -> bool:
+    if not raw_date:
+        return False
+
+    parsed = try_parse_datetime(raw_date)
+    if not parsed:
+        return False
+
+    target = datetime.strptime(normalize_target_date(target_date), "%d-%m-%Y").date()
+    return parsed.date() < target
+
+
+def fetch_listing_article_links(
+    session: requests.Session,
+    listing_url: str,
+) -> list[str]:
+    try:
+        html = fetch_html(
+            session,
+            listing_url,
+            timeout=REQUEST_TIMEOUT,
+            retries=FETCH_RETRIES,
+            delay_seconds=POLITE_DELAY_SECONDS,
+        )
+    except Exception as exc:
+        logging.warning("Failed listing page %s: %s", listing_url, exc)
+        return []
+
+    return extract_article_links(html, listing_url)
+
+
+def fetch_timeline_article_links(
+    session: requests.Session,
+    timeline_url: str,
+    target_date: str,
+) -> TimelineArticleLinks:
+    try:
+        html = fetch_html(
+            session,
+            timeline_url,
+            timeout=REQUEST_TIMEOUT,
+            retries=FETCH_RETRIES,
+            delay_seconds=POLITE_DELAY_SECONDS,
+        )
+    except Exception as exc:
+        logging.warning("Failed timeline page %s: %s", timeline_url, exc)
+        return TimelineArticleLinks(urls=[])
+
+    return extract_timeline_article_links(html, timeline_url, target_date)
+
+
+def collect_candidate_article_urls(
+    session: requests.Session,
+    date_page_url: str,
+    target_date: str,
+    max_timeline_pages: int = DEFAULT_TIMELINE_MAX_PAGES,
+) -> list[str]:
+    article_urls = fetch_listing_article_links(session, date_page_url)
+
+    for category_id in TIMELINE_LEGAL_DOCUMENT_CATEGORY_IDS:
+        for page in range(1, max_timeline_pages + 1):
+            timeline_url = build_timeline_page_url(category_id, page)
+            timeline_articles = fetch_timeline_article_links(
+                session,
+                timeline_url,
+                target_date,
+            )
+            if not timeline_articles.has_document_links:
+                break
+
+            article_urls.extend(timeline_articles.urls)
+
+    seen = set()
+    unique_article_urls = []
+    for article_url in article_urls:
+        if article_url not in seen:
+            seen.add(article_url)
+            unique_article_urls.append(article_url)
+
+    return unique_article_urls
+
+
 def crawl_bo_khoa_hoc_cong_nghe(
     target_date: Optional[str] = None,
     max_articles: int = 50,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
+    max_timeline_pages: int = DEFAULT_TIMELINE_MAX_PAGES,
 ) -> list[dict[str, Optional[str]]]:
     """
     Crawl the MST date listing page.
@@ -263,20 +504,12 @@ def crawl_bo_khoa_hoc_cong_nghe(
     results: list[dict[str, Optional[str]]] = []
     seen_urls: set[str] = set()
 
-    try:
-        html = fetch_html(
-            session,
-            date_page_url,
-            timeout=REQUEST_TIMEOUT,
-            retries=FETCH_RETRIES,
-            delay_seconds=POLITE_DELAY_SECONDS,
-        )
-    except Exception as exc:
-        logging.warning("Failed date page %s: %s", date_page_url, exc)
-        logging.info("Finished. Parsed 0 articles.")
-        return results
-
-    article_urls = extract_article_links(html, date_page_url)
+    article_urls = collect_candidate_article_urls(
+        session,
+        date_page_url,
+        normalized_date,
+        max_timeline_pages=max_timeline_pages,
+    )
     logging.info("Found %d candidate article links", len(article_urls))
 
     for article_url in article_urls:
@@ -302,6 +535,14 @@ def crawl_bo_khoa_hoc_cong_nghe(
                 logging.info("Skip article without title: %s", article_url)
                 continue
 
+            article_date = getattr(article, "issued_date", "") or article.published_at
+            if is_before_target_date(article_date, normalized_date):
+                logging.info(
+                    "Skip old article and stop crawling older timeline entries: %s",
+                    article.title,
+                )
+                continue
+
             if not is_on_target_date(article.published_at, normalized_date):
                 logging.info("Skip article outside target date: %s", article.title)
                 continue
@@ -314,7 +555,7 @@ def crawl_bo_khoa_hoc_cong_nghe(
                 logging.info("Skip irrelevant article: %s", article.title)
                 continue
 
-            results.append(article_to_json_dict(article))
+            results.append(legal_article_to_json_dict(article))
             time.sleep(POLITE_DELAY_SECONDS)
         except Exception as exc:
             logging.warning("Failed article %s: %s", article_url, exc)

@@ -27,6 +27,11 @@ SOURCE_NAME = "Cổng thông tin điện tử Thành phố Hà Nội"
 BASE_SITE_URL = "https://hanoi.gov.vn/"
 API_URL = "https://hanoi.gov.vn/api/NewsZone/NewsZone"
 DEFAULT_CATEGORY_URL = "https://hanoi.gov.vn/chi-dao-cua-ubnd-thanh-pho-ha-noi"
+DEFAULT_CATEGORY_URLS = [
+    DEFAULT_CATEGORY_URL,
+    "https://vanban.hanoi.gov.vn/van-ban-quy-pham-phap-luat",
+    "https://vanban.hanoi.gov.vn/van-ban-chi-dao-dieu-hanh",
+]
 
 DEFAULT_PAGE_SIZE = "DxZD1w2i+8E="
 DEFAULT_CATNAME = "fFeUG2QagshQSId/gnsY7cA7vzDD4bMURXrY7ae9cm68FyOjl3l+4A=="
@@ -93,7 +98,23 @@ def build_form_data(page_index: int) -> dict[str, Any]:
     }
 
 
-def fetch_listing_html(session: requests.Session, page_index: int) -> str:
+def is_news_zone_category(category_url: str) -> bool:
+    return urlparse(category_url).netloc == urlparse(DEFAULT_CATEGORY_URL).netloc
+
+
+def fetch_listing_html(session: requests.Session, page_index: int, category_url: str) -> str:
+    if not is_news_zone_category(category_url):
+        if page_index > 0:
+            return ""
+
+        response = session.get(category_url, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+
+        if not response.encoding or response.encoding.lower() == "iso-8859-1":
+            response.encoding = response.apparent_encoding
+
+        return response.text
+
     response = session.post(
         API_URL,
         data=build_form_data(page_index),
@@ -235,6 +256,44 @@ def extract_listing_articles(
                 source=SOURCE_NAME,
                 published_at=extract_listing_date(node),
                 summary_raw=clean_text(summary_node.get_text(" ") if summary_node else ""),
+                category_url=category_url,
+            )
+        )
+
+    for row in soup.select("table[id$='_gr_items'] tr"):
+        if row.find("th") or "tr-pager" in row.get("class", []):
+            continue
+
+        cells = row.find_all("td")
+        if len(cells) < 4:
+            continue
+
+        title_link = cells[1].select_one("h7 a[href], a[href][title]")
+        code_link = cells[0].select_one("a[href]")
+        link_tag = title_link or code_link
+        if not link_tag:
+            continue
+
+        href = clean_text(link_tag.get("href"))
+        title = clean_text(link_tag.get_text(" ")) or clean_text(link_tag.get("title"))
+        if not href or not title:
+            continue
+
+        url = canonicalize_url(urljoin(category_url, href))
+        if url in seen_links:
+            continue
+        seen_links.add(url)
+
+        code = clean_text(cells[0].get_text(" "))
+        date_node = cells[-1].select_one(".date-pub")
+        raw_date = clean_text(date_node.get_text(" ") if date_node else cells[-1].get_text(" "))
+        articles.append(
+            ParsedArticle(
+                title=title,
+                url=url,
+                source=SOURCE_NAME,
+                published_at=format_datetime(raw_date),
+                summary_raw=code,
                 category_url=category_url,
             )
         )
@@ -398,6 +457,7 @@ def crawl_ubndhn(
     days: Optional[int] = 1,
     max_articles: int = 50,
     max_pages: int = 5,
+    category_urls: Optional[list[str]] = None,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
@@ -419,72 +479,88 @@ def crawl_ubndhn(
     results: list[dict] = []
     seen_links: set[str] = set()
 
-    for page_index in range(max_pages):
-        if len(results) >= max_articles:
-            break
+    for category_url in category_urls or DEFAULT_CATEGORY_URLS:
+        logging.info("Start Hanoi UBND category_url=%s", category_url)
 
-        try:
-            logging.info("Fetching Hanoi UBND page_index=%s", page_index)
-            html = fetch_listing_html(active_session, page_index)
-            listing_articles = extract_listing_articles(html)
-
-            if not listing_articles:
-                logging.info("No articles found for page_index=%s", page_index)
+        for page_index in range(max_pages):
+            if len(results) >= max_articles:
                 break
 
-            page_articles: list[ParsedArticle] = []
+            try:
+                logging.info("Fetching Hanoi UBND category_url=%s page_index=%s", category_url, page_index)
+                html = fetch_listing_html(active_session, page_index, category_url=category_url)
+                listing_articles = extract_listing_articles(html, category_url=category_url)
 
-            for listing_article in listing_articles:
-                if len(results) >= max_articles:
+                if not listing_articles:
+                    logging.info(
+                        "No articles found for category_url=%s page_index=%s",
+                        category_url,
+                        page_index,
+                    )
                     break
-                if listing_article.url in seen_links:
-                    continue
-                seen_links.add(listing_article.url)
 
-                article = listing_article
-                if fetch_details:
-                    try:
-                        detail_html = fetch_html(active_session, listing_article.url)
-                        article = parse_article_detail(detail_html, fallback=listing_article)
-                        time.sleep(POLITE_DELAY_SECONDS)
-                    except Exception as exc:
-                        logging.warning("Failed to fetch detail %s: %s", listing_article.url, exc)
+                page_articles: list[ParsedArticle] = []
 
-                page_articles.append(article)
+                for listing_article in listing_articles:
+                    if len(results) >= max_articles:
+                        break
+                    if listing_article.url in seen_links:
+                        continue
+                    seen_links.add(listing_article.url)
 
-                if not article.title:
-                    logging.info("Skip article without title: %s", listing_article.url)
-                    continue
-                if not is_within_days(article.published_at, days, now=now):
-                    logging.info("Skip old article: %s", article.title)
-                    continue
-                if filter_relevant and not is_relevant_article(
-                    article,
-                    require_legal_keyword=require_legal_keyword,
-                    require_topic_keyword=require_topic_keyword,
-                ):
-                    logging.info("Skip irrelevant article: %s", article.title)
-                    continue
+                    article = listing_article
+                    if fetch_details:
+                        try:
+                            detail_html = fetch_html(active_session, listing_article.url)
+                            article = parse_article_detail(detail_html, fallback=listing_article)
+                            time.sleep(POLITE_DELAY_SECONDS)
+                        except Exception as exc:
+                            logging.warning("Failed to fetch detail %s: %s", listing_article.url, exc)
 
-                results.append(article_to_json_dict(article))
+                    page_articles.append(article)
 
-            if should_stop_after_page(page_articles, days, now=now):
-                oldest_date = get_oldest_article_date(page_articles)
-                logging.info(
-                    "Skip next page because page_index=%s oldest date is %s",
+                    if not article.title:
+                        logging.info("Skip article without title: %s", listing_article.url)
+                        continue
+                    if not is_within_days(article.published_at, days, now=now):
+                        logging.info("Skip old article: %s", article.title)
+                        continue
+                    if filter_relevant and not is_relevant_article(
+                        article,
+                        require_legal_keyword=require_legal_keyword,
+                        require_topic_keyword=require_topic_keyword,
+                    ):
+                        logging.info("Skip irrelevant article: %s", article.title)
+                        continue
+
+                    results.append(article_to_json_dict(article))
+
+                if should_stop_after_page(page_articles, days, now=now):
+                    oldest_date = get_oldest_article_date(page_articles)
+                    logging.info(
+                        "Skip next page because page_index=%s oldest date is %s",
+                        page_index,
+                        oldest_date.strftime("%Y-%m-%d %H:%M") if oldest_date else None,
+                    )
+                    break
+
+                time.sleep(POLITE_DELAY_SECONDS)
+
+            except Exception as exc:
+                logging.warning(
+                    "Failed category_url=%s page_index=%s: %s",
+                    category_url,
                     page_index,
-                    oldest_date.strftime("%Y-%m-%d %H:%M") if oldest_date else None,
+                    exc,
                 )
                 break
 
-            time.sleep(POLITE_DELAY_SECONDS)
-
-        except Exception as exc:
-            logging.warning("Failed page_index=%s: %s", page_index, exc)
-            break
-
     logging.info("Finished. Parsed %d relevant articles.", len(results))
     return results
+
+
+def parse_category_urls(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 def main() -> None:
@@ -508,6 +584,12 @@ def main() -> None:
         type=int,
         default=5,
         help="Số page API tối đa. PageIndex bắt đầu từ 0. Mặc định: 5.",
+    )
+    parser.add_argument(
+        "--category-urls",
+        type=str,
+        default=",".join(DEFAULT_CATEGORY_URLS),
+        help="Danh sách URL chuyên mục, ngăn cách bằng dấu phẩy. Mặc định gồm chỉ đạo UBND và 2 trang văn bản Hà Nội.",
     )
     parser.add_argument(
         "--no-detail",
@@ -537,6 +619,7 @@ def main() -> None:
         days=None if args.days == 0 else args.days,
         max_articles=args.max_articles,
         max_pages=args.max_pages,
+        category_urls=parse_category_urls(args.category_urls),
         filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
