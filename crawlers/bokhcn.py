@@ -369,11 +369,7 @@ def is_relevant_article(
     searchable_text = " ".join(
         [
             article.title,
-            article.summary_raw,
-            getattr(article, "code", ""),
-            getattr(article, "agency", ""),
-            getattr(article, "document_type", ""),
-            getattr(article, "field", ""),
+            article.summary_raw
         ]
     )
     return is_relevant_text(
