@@ -6,7 +6,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
@@ -84,6 +84,30 @@ def normalize_target_date(raw_date: Optional[str]) -> str:
             continue
 
     raise ValueError("Date must be dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd, or yyyy/mm/dd")
+
+
+def get_target_dates(
+    days: Optional[int] = 1,
+    target_date: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> list[str]:
+    if target_date:
+        return [normalize_target_date(target_date)]
+
+    if days is None:
+        days = 1
+
+    current = now or datetime.now(VN_TZ)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=VN_TZ)
+
+    day_count = max(days, 1)
+    end_date = current.astimezone(VN_TZ).date()
+    start_date = end_date - timedelta(days=day_count - 1)
+    return [
+        (start_date + timedelta(days=offset)).strftime("%d-%m-%Y")
+        for offset in range(day_count)
+    ]
 
 
 def build_date_page_url(target_date: str) -> str:
@@ -478,6 +502,7 @@ def collect_candidate_article_urls(
 
 def crawl_bo_khoa_hoc_cong_nghe(
     target_date: Optional[str] = None,
+    days: Optional[int] = 1,
     max_articles: int = 50,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
@@ -489,10 +514,9 @@ def crawl_bo_khoa_hoc_cong_nghe(
 
     Change target_date, for example 26-06-2026, to get articles for that date only.
     """
-    normalized_date = normalize_target_date(target_date)
-    date_page_url = build_date_page_url(normalized_date)
+    target_dates = get_target_dates(days=days, target_date=target_date)
 
-    logging.info("Start crawling Bo Khoa hoc va Cong nghe date=%s", normalized_date)
+    logging.info("Start crawling Bo Khoa hoc va Cong nghe dates=%s", ",".join(target_dates))
 
     session = requests.Session()
     session.headers.update(HEADERS)
@@ -500,61 +524,66 @@ def crawl_bo_khoa_hoc_cong_nghe(
     results: list[dict[str, Optional[str]]] = []
     seen_urls: set[str] = set()
 
-    article_urls = collect_candidate_article_urls(
-        session,
-        date_page_url,
-        normalized_date,
-        max_timeline_pages=max_timeline_pages,
-    )
-    logging.info("Found %d candidate article links", len(article_urls))
-
-    for article_url in article_urls:
+    for normalized_date in target_dates:
         if len(results) >= max_articles:
             break
 
-        if article_url in seen_urls:
-            continue
-        seen_urls.add(article_url)
+        date_page_url = build_date_page_url(normalized_date)
+        article_urls = collect_candidate_article_urls(
+            session,
+            date_page_url,
+            normalized_date,
+            max_timeline_pages=max_timeline_pages,
+        )
+        logging.info("Found %d candidate article links for date=%s", len(article_urls), normalized_date)
 
-        try:
-            logging.info("Fetching article: %s", article_url)
-            article_html = fetch_html(
-                session,
-                article_url,
-                timeout=REQUEST_TIMEOUT,
-                retries=FETCH_RETRIES,
-                delay_seconds=POLITE_DELAY_SECONDS,
-            )
-            article = parse_article(article_html, article_url)
+        for article_url in article_urls:
+            if len(results) >= max_articles:
+                break
 
-            if not article.title:
-                logging.info("Skip article without title: %s", article_url)
+            if article_url in seen_urls:
                 continue
+            seen_urls.add(article_url)
 
-            article_date = getattr(article, "issued_date", "") or article.published_at
-            if is_before_target_date(article_date, normalized_date):
-                logging.info(
-                    "Skip old article and stop crawling older timeline entries: %s",
-                    article.title,
+            try:
+                logging.info("Fetching article: %s", article_url)
+                article_html = fetch_html(
+                    session,
+                    article_url,
+                    timeout=REQUEST_TIMEOUT,
+                    retries=FETCH_RETRIES,
+                    delay_seconds=POLITE_DELAY_SECONDS,
                 )
-                continue
+                article = parse_article(article_html, article_url)
 
-            if not is_on_target_date(article.published_at, normalized_date):
-                logging.info("Skip article outside target date: %s", article.title)
-                continue
+                if not article.title:
+                    logging.info("Skip article without title: %s", article_url)
+                    continue
 
-            if filter_relevant and not is_relevant_article(
-                article,
-                require_legal_keyword=require_legal_keyword,
-                require_topic_keyword=require_topic_keyword,
-            ):
-                logging.info("Skip irrelevant article: %s", article.title)
-                continue
+                article_date = getattr(article, "issued_date", "") or article.published_at
+                if is_before_target_date(article_date, normalized_date):
+                    logging.info(
+                        "Skip old article and stop crawling older timeline entries: %s",
+                        article.title,
+                    )
+                    continue
 
-            results.append(legal_article_to_json_dict(article))
-            time.sleep(POLITE_DELAY_SECONDS)
-        except Exception as exc:
-            logging.warning("Failed article %s: %s", article_url, exc)
+                if not is_on_target_date(article.published_at, normalized_date):
+                    logging.info("Skip article outside target date: %s", article.title)
+                    continue
+
+                if filter_relevant and not is_relevant_article(
+                    article,
+                    require_legal_keyword=require_legal_keyword,
+                    require_topic_keyword=require_topic_keyword,
+                ):
+                    logging.info("Skip irrelevant article: %s", article.title)
+                    continue
+
+                results.append(legal_article_to_json_dict(article))
+                time.sleep(POLITE_DELAY_SECONDS)
+            except Exception as exc:
+                logging.warning("Failed article %s: %s", article_url, exc)
 
     logging.info("Finished. Parsed %d articles.", len(results))
     return results
@@ -569,6 +598,12 @@ def main() -> None:
         type=str,
         default=None,
         help="Ngày cần crawl, ví dụ 27-06-2026 hoặc 2026-06-27. Mặc định: hôm nay.",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=1,
+        help="Chỉ lấy bài trong N ngày theo lịch gần nhất. Mặc định: 1 là hôm nay.",
     )
     parser.add_argument(
         "--max-articles",
@@ -597,6 +632,7 @@ def main() -> None:
 
     articles = crawl_bo_khoa_hoc_cong_nghe(
         target_date=args.date,
+        days=args.days,
         max_articles=args.max_articles,
         filter_relevant=True,
         require_legal_keyword=True,

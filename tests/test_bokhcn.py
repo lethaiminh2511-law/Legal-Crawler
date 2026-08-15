@@ -1,10 +1,27 @@
 import unittest
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from crawlers import bokhcn
 
 
 class BoKhcnTimelineTest(unittest.TestCase):
+    def test_get_target_dates_uses_calendar_days_ending_today(self):
+        now = datetime(2026, 8, 15, 10, 0, tzinfo=bokhcn.VN_TZ)
+
+        self.assertEqual(
+            bokhcn.get_target_dates(days=2, target_date=None, now=now),
+            ["14-08-2026", "15-08-2026"],
+        )
+
+    def test_get_target_dates_prefers_explicit_date_over_days(self):
+        now = datetime(2026, 8, 15, 10, 0, tzinfo=bokhcn.VN_TZ)
+
+        self.assertEqual(
+            bokhcn.get_target_dates(days=2, target_date="2026-08-10", now=now),
+            ["10-08-2026"],
+        )
+
     def test_build_timeline_page_url_uses_category_and_page_number(self):
         self.assertEqual(
             bokhcn.build_timeline_page_url("100", 2),

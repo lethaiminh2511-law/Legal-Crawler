@@ -59,6 +59,29 @@ class MainRunnerTest(unittest.TestCase):
                 check=True,
             )
 
+    def test_run_crawlers_uses_two_day_window_for_morning_crawlers_with_days_arg(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            crawler_dir = Path(tmp) / "crawlers"
+            crawler_dir.mkdir()
+            (crawler_dir / "a.py").write_text('parser.add_argument("--days")', encoding="utf-8")
+
+            with patch.object(
+                main,
+                "Path",
+                side_effect=lambda value: crawler_dir
+                if value == "crawlers"
+                else Path(value),
+            ):
+                with patch.object(main, "resolve_window", return_value="morning", create=True):
+                    with patch.object(main.subprocess, "run") as run:
+                        result = main.run_crawlers()
+
+            self.assertTrue(result)
+            run.assert_called_once_with(
+                [main.sys.executable, "-m", "crawlers.a", "--days", "2"],
+                check=True,
+            )
+
     def test_run_main_only_prints_failure_message_when_crawlers_fail(self):
         with patch.object(main, "run_crawlers", return_value=True):
             with patch.object(main, "run_whatsapp_sender") as sender:

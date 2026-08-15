@@ -3,6 +3,21 @@ import subprocess
 from pathlib import Path
 import traceback
 
+from whatsapp_sender import resolve_window
+
+
+def get_crawler_args(crawler_file: Path, window: str) -> list[str]:
+    try:
+        supports_days = "--days" in crawler_file.read_text(encoding="utf-8")
+    except OSError:
+        supports_days = False
+
+    if not supports_days:
+        return []
+
+    days = "2" if window == "morning" else "1"
+    return ["--days", days]
+
 
 def run_crawlers():
     crawler_dir = Path("crawlers")
@@ -24,14 +39,16 @@ def run_crawlers():
     print(f"🚀 Found {len(crawler_files)} crawler(s)\n")
 
     failed = []
+    selected_window = resolve_window("auto")
 
     for crawler_file in crawler_files:
         print(f"▶ Running: {crawler_file.name}")
         module_name = f"crawlers.{crawler_file.stem}"
+        crawler_args = get_crawler_args(crawler_file, selected_window)
 
         try:
             subprocess.run(
-                [sys.executable, "-m", module_name],
+                [sys.executable, "-m", module_name, *crawler_args],
                 check=True
             )
             print(f"✅ Success: {crawler_file.name}\n")

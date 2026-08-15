@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import argparse
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -16,8 +16,9 @@ CHANNEL_ID = "120363409024011943@newsletter"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 WINDOWS = {
-    "morning": (time(0, 0), time(10, 0)),
-    "afternoon": (time(10, 0), time(17, 0)),
+    "morning": (time(17, 0), time(10, 0)),
+    "midday": (time(10, 0), time(15, 0)),
+    "afternoon": (time(15, 0), time(17, 0)),
 }
 
 
@@ -81,14 +82,20 @@ def resolve_window(window: str, now: Optional[datetime] = None) -> str:
         now = now.replace(tzinfo=VN_TZ)
     now = now.astimezone(VN_TZ)
 
-    return "morning" if now.time() < time(13, 30) else "afternoon"
+    current_time = now.time()
+    if current_time < time(13, 30):
+        return "morning"
+    if current_time < time(16, 30):
+        return "midday"
+    return "afternoon"
 
 
 def get_article_window(window: str, today: datetime) -> Tuple[datetime, datetime]:
     start_time, end_time = WINDOWS[window]
     target_date = today.astimezone(VN_TZ).date()
+    start_date = target_date - timedelta(days=1) if window == "morning" else target_date
     return (
-        datetime.combine(target_date, start_time, tzinfo=VN_TZ),
+        datetime.combine(start_date, start_time, tzinfo=VN_TZ),
         datetime.combine(target_date, end_time, tzinfo=VN_TZ),
     )
 
@@ -160,11 +167,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--window",
-        choices=["auto", "morning", "afternoon"],
+        choices=["auto", "morning", "midday", "afternoon"],
         default="auto",
         help=(
-            "morning: today before 10:00; afternoon: today from 10:00 through 17:00. "
-            "auto picks morning before 13:30, otherwise afternoon."
+            "morning: previous day 17:00 through today before 10:00; "
+            "midday: today from 10:00 through before 15:00; "
+            "afternoon: today from 15:00 through 17:00. "
+            "auto picks morning before 13:30, midday before 16:30, otherwise afternoon."
         ),
     )
     args = parser.parse_args()
