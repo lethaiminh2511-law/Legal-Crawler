@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 load_dotenv()
 
+SESSION_NAME = os.getenv("SESSION_NAME", "default")
 WHATSAPP_API_KEY = os.getenv("WHATSAPP_API_KEY")
 CHANNEL_ID = "120363409024011943@newsletter"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -28,7 +29,7 @@ def send_whatsapp_text(message: str) -> dict:
         "Content-Type": "application/json",
     }
     data = {
-        "session": "default",
+        "session": SESSION_NAME,
         "chatId": CHANNEL_ID,
         "text": message
     }
