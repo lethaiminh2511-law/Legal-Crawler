@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urlencode, urljoin, urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
 import requests
@@ -24,7 +24,16 @@ BASE_SITE_URL = "https://moj.gov.vn/"
 DEFAULT_PREFIXES = [
     "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/chi-dao-dieu-hanh-cua-lanh-dao-bo.html",
     "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/van-ban-chinh-sach-moi.html",
+    "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html",
 ]
+
+LOAD_NEWS_PREFIXES = {
+    "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html": {
+        "chuyentrang": "portal",
+        "categoryId": "tai-lieu-tham-dinh",
+        "pageSize": "10",
+    },
+}
 
 DATE_PATTERN = re.compile(
     r"\b(\d{2}/\d{2}/\d{4}|\d{2}-\d{2}-\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?\b"
@@ -82,6 +91,21 @@ def fetch_html(session: requests.Session, url: str) -> str:
         response.encoding = response.apparent_encoding
 
     return response.text
+
+
+def get_listing_page_url(prefix: str, listing_url: str, page_no: int) -> str:
+    ajax_params = LOAD_NEWS_PREFIXES.get(canonicalize_url(prefix))
+    if not ajax_params:
+        return listing_url
+
+    query = urlencode(
+        {
+            "handler": "LoadNews",
+            "pageNumber": page_no,
+            **ajax_params,
+        }
+    )
+    return urlunparse(urlparse(prefix)._replace(query=query, fragment=""))
 
 
 def is_moj_article_url(url: str) -> bool:
@@ -484,8 +508,9 @@ def crawl_moj(
                 break
 
             try:
+                page_url = get_listing_page_url(prefix, listing_url, page_no)
                 logging.info("Fetching MOJ prefix=%s page_no=%s", prefix, page_no)
-                html = fetch_html(session, listing_url)
+                html = fetch_html(session, page_url)
                 listing_articles = extract_listing_articles(html, category_url=prefix)
 
                 if not listing_articles:
@@ -542,7 +567,10 @@ def crawl_moj(
                     break
 
                 time.sleep(POLITE_DELAY_SECONDS)
-                listing_url = extract_next_listing_url(html, listing_url, page_no)
+                if canonicalize_url(prefix) in LOAD_NEWS_PREFIXES:
+                    listing_url = prefix
+                else:
+                    listing_url = extract_next_listing_url(html, listing_url, page_no)
 
             except Exception as exc:
                 logging.warning("Failed prefix=%s page_no=%s: %s", prefix, page_no, exc)

@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 from crawlers import moj
 
@@ -50,6 +51,41 @@ DETAIL_HTML = """
 
 
 class MojCrawlerTest(unittest.TestCase):
+    def test_default_prefixes_include_tai_lieu_tham_dinh_category(self):
+        self.assertIn(
+            "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html",
+            moj.DEFAULT_PREFIXES,
+        )
+
+    def test_crawl_fetches_tai_lieu_tham_dinh_with_load_news_pagination(self):
+        category_url = "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html"
+        requested_urls = []
+
+        def fake_fetch_html(_session, url):
+            requested_urls.append(url)
+            return LISTING_HTML
+
+        with patch.object(moj, "fetch_html", side_effect=fake_fetch_html):
+            with patch.object(moj.time, "sleep"):
+                articles = moj.crawl_moj(
+                    prefixes=[category_url],
+                    days=None,
+                    max_articles=5,
+                    max_pages_per_prefix=2,
+                    filter_relevant=False,
+                    fetch_details=False,
+                )
+
+        self.assertEqual(
+            requested_urls,
+            [
+                "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html?handler=LoadNews&pageNumber=1&chuyentrang=portal&categoryId=tai-lieu-tham-dinh&pageSize=10",
+                "https://moj.gov.vn/portal/tin-tuc/chuyen-muc/tai-lieu-tham-dinh.html?handler=LoadNews&pageNumber=2&chuyentrang=portal&categoryId=tai-lieu-tham-dinh&pageSize=10",
+            ],
+        )
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(articles[0]["category_url"], category_url)
+
     def test_extract_listing_articles_keeps_article_links_only_and_dedupes(self):
         articles = moj.extract_listing_articles(
             LISTING_HTML,
