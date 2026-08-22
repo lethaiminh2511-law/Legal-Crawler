@@ -21,6 +21,7 @@ VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 SOURCE_NAME = "Cổng thông tin điện tử Bộ Công Thương"
 BASE_SITE_URL = "https://moit.gov.vn/"
 LISTING_URL = "https://moit.gov.vn/"
+DRAFT_LISTING_URL = "https://moit.gov.vn/du-thao-van-ban"
 
 DEFAULT_CATEGORY_ID = "101788658"
 DEFAULT_PARENT_ID = "101788658"
@@ -28,6 +29,11 @@ DEFAULT_MODULE_ID = "25"
 DEFAULT_ITEMS_PER_PAGE = 12
 
 DATE_PATTERN = re.compile(r"\b(\d{2}/\d{2}/\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?\b")
+DRAFT_DATES_PATTERN = re.compile(
+    r"Ngày\s*bắt\s*đầu\s*:\s*(?P<start>\d{2}/\d{2}/\d{4})\s*-\s*"
+    r"Ngày\s*hết\s*hạn\s*:\s*(?P<end>\d{2}/\d{2}/\d{4})?",
+    re.IGNORECASE,
+)
 
 HEADERS = {
     "accept": "*/*",
@@ -55,6 +61,71 @@ class ParsedArticle:
     summary_raw: str
 
 
+@dataclass(frozen=True)
+class ListingSource:
+    module_id: str
+    submit_form_id: str
+    page: str
+    layout: str
+    order_field: str
+    order_value: str
+    widget_code: str
+    parent_id: str
+    article_type: str
+    category_id: str
+    widget_template_id: str
+    image_size_ratio: str
+    module_position: str
+    module_parent_id: str
+    extra_fields: Optional[str] = None
+    block_vb: Optional[str] = None
+    hidden_author: Optional[str] = None
+    hidden_read_more: Optional[str] = None
+    php_module_name: Optional[str] = None
+
+
+def build_news_listing_source(category_id: str, parent_id: str) -> ListingSource:
+    return ListingSource(
+        module_id=DEFAULT_MODULE_ID,
+        submit_form_id=DEFAULT_MODULE_ID,
+        page="Article.News.list",
+        layout="Content.Article.News.default",
+        order_field="orderB",
+        order_value="00publishTime DESC",
+        widget_code="5b72a94b9218655475508114",
+        parent_id=parent_id,
+        article_type="Article.News",
+        category_id=category_id,
+        widget_template_id="5feffbc0cccf1c7cdf7dada3",
+        image_size_ratio="3:2",
+        module_position="0",
+        module_parent_id="12",
+        hidden_author="1",
+        hidden_read_more="1",
+        php_module_name="Content.Listing",
+    )
+
+
+LEGAL_DOCUMENT_LISTING_SOURCE = ListingSource(
+    module_id="12",
+    submit_form_id="12",
+    page="Article.LegalDocument.list",
+    layout="Content.Article.LegalDocument.default",
+    order_field="orderBy",
+    order_value="publishTime DESC",
+    widget_code="5b73e3f1921865098125edb5",
+    parent_id="101788669",
+    article_type="Article.LegalDocument",
+    category_id="101788669",
+    widget_template_id="5ff43820517c7b17487e1572",
+    image_size_ratio="16:9",
+    module_position="10",
+    module_parent_id="7",
+    extra_fields="code",
+    block_vb="1",
+)
+
+
 def clean_text(text: Optional[str]) -> str:
     if not text:
         return ""
@@ -73,44 +144,56 @@ def fetch_html(session: requests.Session, url: str) -> str:
     return response.text
 
 
+def build_draft_listing_page_url(page_no: int) -> str:
+    if page_no <= 1:
+        return DRAFT_LISTING_URL
+    return f"{DRAFT_LISTING_URL}?page={page_no}"
+
+
 def fetch_listing_page(
     session: requests.Session,
     page_no: int,
     items_per_page: int,
     category_id: str = DEFAULT_CATEGORY_ID,
     parent_id: str = DEFAULT_PARENT_ID,
+    listing_source: Optional[ListingSource] = None,
 ) -> str:
+    source = listing_source or build_news_listing_source(category_id, parent_id)
     params = [
         ("module", "Content.Listing"),
-        ("moduleId", DEFAULT_MODULE_ID),
+        ("moduleId", source.module_id),
         ("cmd", "redraw"),
         ("site", "2005517"),
         ("url_mode", "rewrite"),
-        ("submitFormId", DEFAULT_MODULE_ID),
-        ("moduleId", DEFAULT_MODULE_ID),
-        ("page", "Article.News.list"),
+        ("submitFormId", source.submit_form_id),
+        ("page", source.page),
         ("site", "2005517"),
     ]
     data = {
-        "layout": "Content.Article.News.default",
+        "layout": source.layout,
         "itemsPerPage": str(items_per_page),
-        "orderB": "00publishTime DESC",
+        source.order_field: source.order_value,
         "pageNo": str(page_no),
         "service": "Content.Article.selectAll",
-        "widgetCode": "5b72a94b9218655475508114",
-        "parentId": parent_id,
-        "type": "Article.News",
-        "categoryId": category_id,
-        "widgetTemplateId": "5feffbc0cccf1c7cdf7dada3",
-        "imageSizeRatio": "3:2",
-        "hiddenAuthor": "1",
-        "hiddenReadMore": "1",
-        "page": "Article.News.list",
-        "modulePosition": "0",
-        "moduleParentId": "12",
-        "phpModuleName": "Content.Listing",
+        "widgetCode": source.widget_code,
+        "parentId": source.parent_id,
+        "type": source.article_type,
+        "categoryId": source.category_id,
+        "widgetTemplateId": source.widget_template_id,
+        "imageSizeRatio": source.image_size_ratio,
+        "page": source.page,
+        "modulePosition": source.module_position,
+        "moduleParentId": source.module_parent_id,
         "_t": str(int(time.time() * 1000)),
     }
+    optional_fields = {
+        "extraFields": source.extra_fields,
+        "blockVB": source.block_vb,
+        "hiddenAuthor": source.hidden_author,
+        "hiddenReadMore": source.hidden_read_more,
+        "phpModuleName": source.php_module_name,
+    }
+    data.update({key: value for key, value in optional_fields.items() if value is not None})
 
     response = session.post(
         LISTING_URL,
@@ -184,8 +267,13 @@ def extract_listing_articles(html: str) -> list[ParsedArticle]:
     soup = BeautifulSoup(html, "html.parser")
     articles: list[ParsedArticle] = []
 
-    for node in soup.select("article.article-news"):
-        title_tag = node.select_one("a.article-title")
+    listing_nodes = soup.select("article.article-news, .document-item, .article-item, li.article-news, tr")
+
+    for node in listing_nodes:
+        title_tag = node.select_one(
+            "a.article-title, a.document-title, a.legal-title, "
+            'a[href*="/van-ban-phap-luat/"], a[href*="/tin-tuc/"], a[href]'
+        )
         if not title_tag:
             continue
 
@@ -194,8 +282,15 @@ def extract_listing_articles(html: str) -> list[ParsedArticle]:
         if not title or not href:
             continue
 
-        date_text = clean_text(node.select_one(".article-date").get_text(" ") if node.select_one(".article-date") else "")
-        summary = clean_text(node.select_one(".article-brief").get_text(" ") if node.select_one(".article-brief") else "")
+        cells = node.find_all("td", recursive=False)
+        date_node = node.select_one(".article-date, .date, .publish-time")
+        summary_node = node.select_one(".article-brief, .summary, .desc")
+        if cells:
+            summary = clean_text(cells[2].get_text(" ") if len(cells) > 2 else "")
+            date_text = clean_text(cells[3].get_text(" ") if len(cells) > 3 else "")
+        else:
+            date_text = clean_text(date_node.get_text(" ") if date_node else "")
+            summary = clean_text(summary_node.get_text(" ") if summary_node else "")
 
         articles.append(
             ParsedArticle(
@@ -203,6 +298,65 @@ def extract_listing_articles(html: str) -> list[ParsedArticle]:
                 url=urljoin(BASE_SITE_URL, href.lstrip("/")),
                 source=SOURCE_NAME,
                 published_at=format_datetime(date_text),
+                summary_raw=summary,
+            )
+        )
+
+    return articles
+
+
+def extract_draft_date_summary(text: str) -> tuple[Optional[str], str]:
+    match = DRAFT_DATES_PATTERN.search(clean_text(text))
+    if not match:
+        return None, ""
+
+    start_date = match.group("start")
+    return format_datetime(start_date), clean_text(match.group(0))
+
+
+def find_draft_item_text(anchor) -> str:
+    fallback_text = ""
+
+    for parent in anchor.parents:
+        if not getattr(parent, "find_all", None):
+            continue
+
+        text = clean_text(parent.get_text(" "))
+        if "Ngày bắt đầu" not in text:
+            continue
+
+        if not fallback_text:
+            fallback_text = text
+
+        anchors = parent.find_all("a")
+        if len(anchors) <= 3 or parent.name in {"article", "li", "tr"}:
+            return text
+
+    return fallback_text
+
+
+def extract_draft_listing_articles(html: str) -> list[ParsedArticle]:
+    soup = BeautifulSoup(html, "html.parser")
+    articles: list[ParsedArticle] = []
+
+    for title_tag in soup.find_all("a", href=True):
+        href = clean_text(title_tag.get("href"))
+        title = clean_text(title_tag.get_text(" ") or title_tag.get("title"))
+
+        if not href or "/du-thao-van-ban/" not in href:
+            continue
+        if not title or title.lower() == "xem góp ý":
+            continue
+
+        item_text = find_draft_item_text(title_tag)
+        published_at, summary = extract_draft_date_summary(item_text)
+
+        articles.append(
+            ParsedArticle(
+                title=title,
+                url=urljoin(BASE_SITE_URL, href.lstrip("/")),
+                source=SOURCE_NAME,
+                published_at=published_at,
                 summary_raw=summary,
             )
         )
@@ -385,24 +539,99 @@ def crawl_bo_cong_thuong(
 
     results: list[dict] = []
     seen_links: set[str] = set()
+    listing_sources = [
+        build_news_listing_source(category_id, parent_id),
+        LEGAL_DOCUMENT_LISTING_SOURCE,
+    ]
+
+    for listing_source in listing_sources:
+        for page_no in range(1, max_pages + 1):
+            try:
+                logging.info(
+                    "Fetching MOIT source=%s page_no=%s items_per_page=%s",
+                    listing_source.article_type,
+                    page_no,
+                    items_per_page,
+                )
+                html = fetch_listing_page(
+                    session=session,
+                    page_no=page_no,
+                    items_per_page=items_per_page,
+                    listing_source=listing_source,
+                )
+                listing_articles = extract_listing_articles(html)
+
+                if not listing_articles:
+                    logging.info("No articles found on source=%s page_no=%s", listing_source.article_type, page_no)
+                    break
+
+                should_stop = False
+
+                for listing_article in listing_articles:
+                    if len(results) >= max_articles:
+                        break
+
+                    if is_older_than_window(listing_article.published_at, days):
+                        logging.info("Stop at old article date: %s", listing_article.title)
+                        should_stop = True
+                        break
+
+                    if listing_article.url in seen_links:
+                        continue
+                    seen_links.add(listing_article.url)
+
+                    article = listing_article
+
+                    if fetch_details:
+                        try:
+                            detail_html = fetch_html(session, listing_article.url)
+                            article = parse_article_detail(detail_html, fallback=listing_article)
+                            time.sleep(POLITE_DELAY_SECONDS)
+                        except Exception as exc:
+                            logging.warning("Failed to fetch detail %s: %s", listing_article.url, exc)
+
+                    if not article.title:
+                        logging.info("Skip article without title: %s", listing_article.url)
+                        continue
+
+                    if not is_within_days(article.published_at, days):
+                        logging.info("Skip old article: %s", article.title)
+                        continue
+
+                    if filter_relevant and not is_relevant_article(
+                        article,
+                        require_legal_keyword=require_legal_keyword,
+                        require_topic_keyword=require_topic_keyword,
+                    ):
+                        logging.info("Skip irrelevant article: %s", article.title)
+                        continue
+
+                    results.append(article_to_json_dict(article))
+
+                if should_stop:
+                    break
+
+                if len(results) >= max_articles:
+                    break
+
+                time.sleep(POLITE_DELAY_SECONDS)
+
+                if len(listing_articles) < items_per_page:
+                    break
+
+            except Exception as exc:
+                logging.warning("Failed source=%s page_no=%s: %s", listing_source.article_type, page_no, exc)
+                break
 
     for page_no in range(1, max_pages + 1):
-        if len(results) >= max_articles:
-            break
-
         try:
-            logging.info("Fetching MOIT page_no=%s items_per_page=%s", page_no, items_per_page)
-            html = fetch_listing_page(
-                session=session,
-                page_no=page_no,
-                items_per_page=items_per_page,
-                category_id=category_id,
-                parent_id=parent_id,
-            )
-            listing_articles = extract_listing_articles(html)
+            listing_url = build_draft_listing_page_url(page_no)
+            logging.info("Fetching MOIT draft listing page_no=%s url=%s", page_no, listing_url)
+            html = fetch_html(session, listing_url)
+            listing_articles = extract_draft_listing_articles(html)
 
             if not listing_articles:
-                logging.info("No articles found on page_no=%s", page_no)
+                logging.info("No draft articles found on page_no=%s", page_no)
                 break
 
             should_stop = False
@@ -412,7 +641,7 @@ def crawl_bo_cong_thuong(
                     break
 
                 if is_older_than_window(listing_article.published_at, days):
-                    logging.info("Stop at old article date: %s", listing_article.title)
+                    logging.info("Stop at old draft article date: %s", listing_article.title)
                     should_stop = True
                     break
 
@@ -428,14 +657,14 @@ def crawl_bo_cong_thuong(
                         article = parse_article_detail(detail_html, fallback=listing_article)
                         time.sleep(POLITE_DELAY_SECONDS)
                     except Exception as exc:
-                        logging.warning("Failed to fetch detail %s: %s", listing_article.url, exc)
+                        logging.warning("Failed to fetch draft detail %s: %s", listing_article.url, exc)
 
                 if not article.title:
-                    logging.info("Skip article without title: %s", listing_article.url)
+                    logging.info("Skip draft article without title: %s", listing_article.url)
                     continue
 
                 if not is_within_days(article.published_at, days):
-                    logging.info("Skip old article: %s", article.title)
+                    logging.info("Skip old draft article: %s", article.title)
                     continue
 
                 if filter_relevant and not is_relevant_article(
@@ -443,12 +672,15 @@ def crawl_bo_cong_thuong(
                     require_legal_keyword=require_legal_keyword,
                     require_topic_keyword=require_topic_keyword,
                 ):
-                    logging.info("Skip irrelevant article: %s", article.title)
+                    logging.info("Skip irrelevant draft article: %s", article.title)
                     continue
 
                 results.append(article_to_json_dict(article))
 
             if should_stop:
+                break
+
+            if len(results) >= max_articles:
                 break
 
             time.sleep(POLITE_DELAY_SECONDS)
@@ -457,7 +689,7 @@ def crawl_bo_cong_thuong(
                 break
 
         except Exception as exc:
-            logging.warning("Failed page_no=%s: %s", page_no, exc)
+            logging.warning("Failed draft page_no=%s: %s", page_no, exc)
             break
 
     logging.info("Finished. Parsed %d relevant articles.", len(results))
