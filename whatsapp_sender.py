@@ -16,9 +16,10 @@ CHANNEL_ID = "120363409024011943@newsletter"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 WINDOWS = {
-    "morning": (time(17, 0), time(10, 0)),
+    "morning": (time(22, 0), time(10, 0)),
     "midday": (time(10, 0), time(15, 0)),
     "afternoon": (time(15, 0), time(17, 0)),
+    "evening": (time(17, 0), time(22, 0)),
 }
 
 
@@ -87,7 +88,9 @@ def resolve_window(window: str, now: Optional[datetime] = None) -> str:
         return "morning"
     if current_time < time(16, 30):
         return "midday"
-    return "afternoon"
+    if current_time < time(19, 30):
+        return "afternoon"
+    return "evening"
 
 
 def get_article_window(window: str, today: datetime) -> Tuple[datetime, datetime]:
@@ -105,7 +108,7 @@ def is_in_window(published_at: Optional[datetime], start_at: datetime, end_at: d
         return True
 
     published_at = published_at.astimezone(VN_TZ)
-    if end_at.time() == time(17, 0):
+    if end_at.time() in {time(17, 0), time(22, 0)}:
         return start_at <= published_at <= end_at
     return start_at <= published_at < end_at
 
@@ -167,13 +170,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--window",
-        choices=["auto", "morning", "midday", "afternoon"],
+        choices=["auto", "morning", "midday", "afternoon", "evening"],
         default="auto",
         help=(
-            "morning: previous day 17:00 through today before 10:00; "
+            "morning: previous day 22:00 through today before 10:00; "
             "midday: today from 10:00 through before 15:00; "
-            "afternoon: today from 15:00 through 17:00. "
-            "auto picks morning before 13:30, midday before 16:30, otherwise afternoon."
+            "afternoon: today from 15:00 through 17:00; "
+            "evening: today from 17:00 through 22:00. "
+            "auto picks morning before 13:30, midday before 16:30, "
+            "afternoon before 19:30, otherwise evening."
         ),
     )
     args = parser.parse_args()
