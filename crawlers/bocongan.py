@@ -20,8 +20,11 @@ VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 SOURCE_NAME = "Cổng thông tin điện tử Bộ Công an"
 BASE_SITE_URL = "https://bocongan.gov.vn/"
 API_SEARCH_URL = "https://api-portal.bocongan.gov.vn/backend-portal/articles/search"
+API_DRAFT_DOCUMENT_URL = "https://api-portal.bocongan.gov.vn/backend-portal/draft-document"
 
 DEFAULT_CATEGORY_IDS = [1065, 1066, 1067]
+DRAFT_DOCUMENT_CATEGORY_ID = 0
+DRAFT_DOCUMENT_PAGE_SIZE = 20
 
 HEADERS = {
     "accept": "*/*",
@@ -326,14 +329,45 @@ def fetch_category_page(
     return extract_items(response.json())
 
 
+def format_draft_start_from(run_date: Optional[str] = None, days: Optional[int] = None) -> str:
+    if run_date:
+        parsed = try_parse_datetime(run_date)
+        if parsed:
+            start_date = parsed - timedelta(days=days or 0)
+            return start_date.strftime("%Y-%m-%d 00:00:00")
+        return f"{clean_text(run_date)} 00:00:00"
+
+    start_date = datetime.now(VN_TZ) - timedelta(days=days or 0)
+    return start_date.strftime("%Y-%m-%d 00:00:00")
+
+
+def fetch_draft_document_page(
+    session: requests.Session,
+    page: int,
+    size: int,
+    start_from: str,
+) -> list[dict[str, Any]]:
+    params = {
+        "page": page,
+        "size": size,
+        "resType": 1,
+        "startFrom": start_from,
+    }
+    response = session.get(API_DRAFT_DOCUMENT_URL, params=params, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    return extract_items(response.json())
+
+
 def crawl_bo_cong_an(
     category_ids: Optional[list[int]] = None,
     days: Optional[int] = 7,
     max_articles: int = 50,
     page_size: int = 10,
+    draft_page_size: int = DRAFT_DOCUMENT_PAGE_SIZE,
     max_pages_per_category: int = 5,
     date_from: str = "",
     date_to: str = "",
+    run_date: Optional[str] = None,
     filter_relevant: bool = True,
     require_legal_keyword: bool = True,
     require_topic_keyword: bool = True,
@@ -363,6 +397,64 @@ def crawl_bo_cong_an(
 
     results: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
+
+    draft_start_from = format_draft_start_from(run_date, days)
+    logging.info("Start draft documents startFrom=%s", draft_start_from)
+
+    for page in range(max_pages_per_category):
+        if len(results) >= max_articles:
+            break
+
+        try:
+            logging.info("Fetching draft documents page=%s size=%s", page, draft_page_size)
+            records = fetch_draft_document_page(
+                session=session,
+                page=page,
+                size=draft_page_size,
+                start_from=draft_start_from,
+            )
+
+            if not records:
+                logging.info("No draft document records for page=%s", page)
+                break
+
+            for record in records:
+                if len(results) >= max_articles:
+                    break
+
+                article = parse_article_record(record, category_id=DRAFT_DOCUMENT_CATEGORY_ID)
+
+                if not article.title:
+                    logging.info("Skip draft document without title: %s", record)
+                    continue
+
+                dedupe_key = article.url or f"{article.category_id}:{article.title}:{article.published_at}"
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
+
+                if not is_within_days(article.published_at, days):
+                    logging.info("Skip old draft document: %s", article.title)
+                    continue
+
+                if filter_relevant and not is_relevant_article(
+                    article,
+                    require_legal_keyword=require_legal_keyword,
+                    require_topic_keyword=require_topic_keyword,
+                ):
+                    logging.info("Skip irrelevant draft document: %s", article.title)
+                    continue
+
+                results.append(article_to_json_dict(article))
+
+            time.sleep(POLITE_DELAY_SECONDS)
+
+            if len(records) < draft_page_size:
+                break
+
+        except Exception as exc:
+            logging.warning("Failed draft documents page=%s: %s", page, exc)
+            break
 
     for category_id in category_ids:
         logging.info("Start category_id=%s", category_id)
@@ -461,6 +553,12 @@ def main() -> None:
         help="Số bài mỗi page API. Mặc định: 10.",
     )
     parser.add_argument(
+        "--draft-page-size",
+        type=int,
+        default=DRAFT_DOCUMENT_PAGE_SIZE,
+        help="Số bài mỗi page API draft-document. Mặc định: 20.",
+    )
+    parser.add_argument(
         "--max-pages-per-category",
         type=int,
         default=5,
@@ -508,9 +606,11 @@ def main() -> None:
         days=None if args.days == 0 else args.days,
         max_articles=args.max_articles,
         page_size=args.page_size,
+        draft_page_size=args.draft_page_size,
         max_pages_per_category=args.max_pages_per_category,
         date_from=args.date_from,
         date_to=args.date_to,
+        run_date=None,
         filter_relevant=True,
         require_legal_keyword=True,
         require_topic_keyword=True,
