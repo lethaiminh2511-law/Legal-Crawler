@@ -261,6 +261,46 @@ class BvhttdlCrawlerTest(unittest.TestCase):
             fetched_urls,
         )
 
+    def test_crawl_skips_old_listing_records_before_fetching_details(self):
+        listing_html = """
+            <article class="gyk-item">
+              <div class="gyk-deadline">Thời hạn: <span>01/07/2026 - 10/07/2026</span></div>
+              <h3 class="gyk-title">
+                <a href="/y-kien-cho-van-ban-du-thao?dtid=7000" class="gyk-title-link">
+                  Lấy ý kiến dự thảo Nghị định về dữ liệu cá nhân
+                </a>
+              </h3>
+            </article>
+        """
+        fetched_urls = []
+
+        def fake_fetch_html(_session, url, **_kwargs):
+            fetched_urls.append(url)
+            if url == bvhttdl.build_listing_page_url("van-ban-du-thao", 1):
+                return listing_html
+            if url == bvhttdl.build_listing_page_url("van-ban-quan-ly", 1):
+                return "<html></html>"
+            raise AssertionError(f"detail page should not be fetched: {url}")
+
+        with patch.object(bvhttdl.requests, "Session", return_value=MagicMock()):
+            with patch.object(bvhttdl, "fetch_html", side_effect=fake_fetch_html):
+                results = bvhttdl.crawl_bo_van_hoa_the_thao_du_lich(
+                    days=1,
+                    max_articles=5,
+                    max_pages=1,
+                    filter_relevant=True,
+                    now=bvhttdl.datetime(2026, 8, 22, 12, 0, tzinfo=bvhttdl.VN_TZ),
+                )
+
+        self.assertEqual(results, [])
+        self.assertEqual(
+            fetched_urls,
+            [
+                bvhttdl.build_listing_page_url("van-ban-du-thao", 1),
+                bvhttdl.build_listing_page_url("van-ban-quan-ly", 1),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
