@@ -25,6 +25,7 @@ LEGAL_KEYWORDS = [
     "thủ tục hành chính",
     "thanh tra",
     "hậu kiểm",
+    "tài liệu thẩm định"
 ]
 
 TOPIC_KEYWORDS = [
@@ -38,6 +39,7 @@ TOPIC_KEYWORDS = [
     "quyền riêng tư",
     "bảo mật thông tin",
     "vi phạm dữ liệu",
+    "an ninh dữ liệu",
     "an ninh mạng",
     "mã độc",
     "tấn công mạng",
@@ -59,7 +61,6 @@ TOPIC_KEYWORDS = [
     "nền tảng trực tuyến",
     "nền tảng trung gian",
     "dịch vụ số",
-    "dịch vụ số xuyên biên giới",
     "dịch vụ trung gian",
     "dịch vụ lưu trữ",
     "dịch vụ truyền hình",
@@ -71,7 +72,6 @@ TOPIC_KEYWORDS = [
     "dịch vụ xuyên biên giới",
     "dịch vụ số xuyên biên giới",
     "cung cấp dịch vụ xuyên biên giới",
-    "quảng cáo xuyên biên giới",
     "thương mại điện tử",
     "giao dịch điện tử",
     "hợp đồng điện tử",
