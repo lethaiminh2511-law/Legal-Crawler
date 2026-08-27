@@ -448,9 +448,6 @@ def is_relevant_article(
         ]
     )
     require_topic = require_topic_keyword
-    if "/y-kien-cho-van-ban-du-thao" in article.url:
-        require_topic = False
-
     return is_relevant_text(
         searchable,
         require_legal_keyword=require_legal_keyword,
