@@ -133,6 +133,70 @@ class BoKhcnTimelineTest(unittest.TestCase):
         self.assertEqual(article.summary_raw, "Quyết định về dữ liệu cá nhân")
         self.assertEqual(article.issued_date, "15/07/2026")
 
+    def test_parse_news_article_does_not_extract_legal_document_fields(self):
+        article = bokhcn.parse_article(
+            """
+            <html>
+              <head><meta name="description" content="Bài viết về chính sách dữ liệu"></head>
+              <body>
+                <h1>Bộ KH&CN hỗ trợ phát triển hạ tầng số</h1>
+                <time datetime="2026-07-15T08:00:00+07:00"></time>
+                <p>
+                  Tỉnh đang tập trung vào lĩnh vực khoa học, công nghệ,
+                  đổi mới sáng tạo và chuyển đổi số.
+                </p>
+              </body>
+            </html>
+            """,
+            "https://mst.gov.vn/bo-khcn-ho-tro-ha-tang-so-19726071521441039.htm",
+        )
+
+        self.assertEqual(article.code, "")
+        self.assertEqual(article.agency, "")
+        self.assertEqual(article.document_type, "")
+        self.assertEqual(article.field, "")
+        self.assertEqual(article.issued_date, "")
+
+    def test_parse_draft_document_summary_uses_trich_dan_only(self):
+        article = bokhcn.parse_article(
+            """
+            <html>
+              <body>
+                <h1>Chi tiết dự thảo HỆ THỐNG VĂN BẢN</h1>
+                <a>Tóm tắt nội dung</a>
+                <a>Dự thảo gốc/PDF</a>
+                <div>
+                  Trích dẫn
+                  Dự thảo Thông tư Quy định quản lý giá dịch vụ viễn thông
+                  và phương pháp định giá dịch vụ viễn thông.
+                  Ngày bắt đầu
+                  07/09/2026
+                  Ngày hết hạn
+                  07/10/2026
+                  Download
+                  DU THAO THONG TU.doc
+                </div>
+                <section>
+                  Dự thảo khác liên quan
+                  Dự thảo Quyết định thay thế Quyết định số 46/2017/QĐ-TTg.
+                </section>
+                <footer>
+                  HỆ THỐNG VĂN BẢN MST IOFFICE THỐNG KÊ MULTIMEDIA
+                </footer>
+              </body>
+            </html>
+            """,
+            "https://mst.gov.vn/van-ban-phap-luat/du-thao/2557.htm",
+        )
+
+        self.assertEqual(
+            article.summary_raw,
+            (
+                "Dự thảo Thông tư Quy định quản lý giá dịch vụ viễn thông "
+                "và phương pháp định giá dịch vụ viễn thông."
+            ),
+        )
+
     def test_crawl_filters_old_legal_documents_from_timeline_listing(self):
         current_url = "https://mst.gov.vn/van-ban-phap-luat/100.htm"
         old_url = "https://mst.gov.vn/van-ban-phap-luat/99.htm"

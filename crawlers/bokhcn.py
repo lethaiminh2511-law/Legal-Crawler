@@ -24,7 +24,7 @@ SOURCE_NAME = "Cổng Thông tin điện tử Bộ Khoa học và Công nghệ"
 BASE_SITE_URL = "https://mst.gov.vn/"
 DATE_PAGE_TEMPLATE = "https://mst.gov.vn/tin-tuc-su-kien/xem-theo-ngay-{date}.htm"
 TIMELINE_PAGE_TEMPLATE = "https://mst.gov.vn/timeline-van-ban/{category_id}/{page}.htm"
-TIMELINE_LEGAL_DOCUMENT_CATEGORY_IDS = ("100", "101", "2")
+TIMELINE_LEGAL_DOCUMENT_CATEGORY_IDS = ("100", "101", "2", "3")
 DEFAULT_TIMELINE_MAX_PAGES = 10
 
 ARTICLE_URL_PATTERN = re.compile(
@@ -37,6 +37,32 @@ LEGAL_DOCUMENT_URL_PATTERN = re.compile(
 )
 DATE_PATTERN = re.compile(
     r"\b(\d{2}/\d{2}/\d{4}|\d{2}-\d{2}-\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?\b"
+)
+DRAFT_LEGAL_DOCUMENT_URL_PATTERN = re.compile(
+    r"^/van-ban-phap-luat/du-thao/\d+\.htm$",
+    re.IGNORECASE,
+)
+LABELED_VALUE_STOP_LABELS = (
+    "Số hiệu",
+    "Số / Ký hiệu",
+    "Cơ quan ban hành",
+    "Hình thức văn bản",
+    "Lĩnh vực",
+    "Trích yếu nội dung",
+    "Trích yếu",
+    "Trích dẫn",
+    "Ngày ban hành",
+    "Ngày có hiệu lực",
+    "Ngày hết hiệu lực",
+    "Ngày bắt đầu",
+    "Ngày hết hạn",
+    "Người ký duyệt",
+    "Người ký",
+    "Tài liệu đính kèm",
+    "Download",
+    "Văn bản khác liên quan",
+    "Dự thảo khác liên quan",
+    "Gửi góp ý",
 )
 
 HEADERS = {
@@ -255,11 +281,9 @@ def extract_labeled_value(soup: BeautifulSoup, label: str) -> str:
                 return value
 
     page_text = clean_text(soup.get_text(" "))
+    stop_labels = "|".join(re.escape(stop_label) for stop_label in LABELED_VALUE_STOP_LABELS)
     pattern = re.compile(
-        rf"{re.escape(label)}\s*:?\s*(.+?)(?=\s+(?:Số hiệu|Số / Ký hiệu|"
-        r"Cơ quan ban hành|Hình thức văn bản|Lĩnh vực|Trích yếu nội dung|"
-        r"Trích yếu|Ngày ban hành|Ngày có hiệu lực|Ngày hết hiệu lực|"
-        r"Người ký duyệt|Người ký|Tài liệu đính kèm)\b|$)",
+        rf"{re.escape(label)}\s*:?\s*(.+?)(?=\s+(?:{stop_labels})\b|$)",
         re.IGNORECASE,
     )
     match = pattern.search(page_text)
@@ -321,8 +345,12 @@ def extract_published_at(soup: BeautifulSoup) -> Optional[str]:
     return None
 
 
-def extract_summary(soup: BeautifulSoup) -> str:
-    for label in ["Trích yếu nội dung", "Trích yếu", "Tóm tắt"]:
+def extract_summary(soup: BeautifulSoup, url: str = "") -> str:
+    labels = ["Trích yếu nội dung", "Trích yếu", "Tóm tắt"]
+    if DRAFT_LEGAL_DOCUMENT_URL_PATTERN.match(urlparse(url).path):
+        labels = ["Trích dẫn", *labels]
+
+    for label in labels:
         value = extract_labeled_value(soup, label)
         if value:
             return value
@@ -348,21 +376,27 @@ def extract_summary(soup: BeautifulSoup) -> str:
 def parse_article(html: str, url: str) -> ParsedArticle:
     soup = BeautifulSoup(html, "html.parser")
 
-    code = extract_labeled_value(soup, "Số hiệu") or extract_labeled_value(
-        soup,
-        "Số / Ký hiệu",
-    )
-    agency = extract_labeled_value(soup, "Cơ quan ban hành")
-    document_type = extract_labeled_value(soup, "Hình thức văn bản")
-    field = extract_labeled_value(soup, "Lĩnh vực")
-    issued_date = extract_labeled_value(soup, "Ngày ban hành")
+    code = ""
+    agency = ""
+    document_type = ""
+    field = ""
+    issued_date = ""
+    if LEGAL_DOCUMENT_URL_PATTERN.match(urlparse(url).path):
+        code = extract_labeled_value(soup, "Số hiệu") or extract_labeled_value(
+            soup,
+            "Số / Ký hiệu",
+        )
+        agency = extract_labeled_value(soup, "Cơ quan ban hành")
+        document_type = extract_labeled_value(soup, "Hình thức văn bản")
+        field = extract_labeled_value(soup, "Lĩnh vực")
+        issued_date = extract_labeled_value(soup, "Ngày ban hành")
 
     return ParsedLegalArticle(
         title=extract_title(soup),
         url=url,
         source=SOURCE_NAME,
         published_at=extract_published_at(soup),
-        summary_raw=extract_summary(soup),
+        summary_raw=extract_summary(soup, url),
         code=code,
         agency=agency,
         document_type=document_type,
