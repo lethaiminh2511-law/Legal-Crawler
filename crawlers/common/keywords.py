@@ -106,6 +106,16 @@ TOPIC_KEYWORDS = [
     "quyền sao chép tạm thời",
     "ngoại lệ quyền tác giả",
     "giới hạn quyền tác giả",
+    "tin sai sự thật",
+    "mạng xã hội",
+    "phát thanh truyền hình",
+    "tin nhắn rác",
+    "cuộc gọi rác",
+    "thư điện tử rác",
+    "hàng hóa",
+    "thương mại",
+    "quản lý ngoại thương",
+    "đầu tư nước ngoài",
 ]
 
 
