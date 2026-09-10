@@ -116,6 +116,8 @@ TOPIC_KEYWORDS = [
     "thương mại",
     "quản lý ngoại thương",
     "đầu tư nước ngoài",
+    "kinh doanh bất động sản",
+    "luật đầu tư"
 ]
 
 
