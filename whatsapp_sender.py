@@ -135,7 +135,7 @@ def format_crawled_items(items: List[Dict]) -> str:
     """
 
     if not items:
-        return "Không có thông tin mới được crawl."
+        return None
 
     lines = ["Legal Crawler - Có thông tin mới:\n"]
 
@@ -159,9 +159,10 @@ def format_crawled_items(items: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def send_crawled_info_to_whatsapp(items: List[Dict]) -> dict:
+def send_crawled_info_to_whatsapp(items: List[Dict]) -> dict | None:
     message = format_crawled_items(items)
-    return send_whatsapp_text(message)
+    if message:
+        return send_whatsapp_text(message)
 
 
 if __name__ == "__main__":
@@ -200,4 +201,5 @@ if __name__ == "__main__":
     print(f"Selected {len(crawled_items)} item(s) for {selected_window} WhatsApp window.")
 
     result = send_crawled_info_to_whatsapp(crawled_items)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
