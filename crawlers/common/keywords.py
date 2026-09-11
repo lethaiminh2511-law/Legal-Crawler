@@ -95,6 +95,7 @@ TOPIC_KEYWORDS = [
     "nhãn hiệu",
     "sáng chế",
     "kiểu dáng công nghiệp",
+    "sở hữu công nghiệp",
     "bí mật kinh doanh",
     "chỉ dẫn địa lý",
     "đơn đăng ký sở hữu công nghiệp",
