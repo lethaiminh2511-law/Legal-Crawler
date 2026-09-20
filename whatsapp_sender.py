@@ -12,7 +12,10 @@ load_dotenv()
 
 SESSION_NAME = os.getenv("SESSION_NAME", "default")
 WHATSAPP_API_KEY = os.getenv("WHATSAPP_API_KEY")
-CHANNEL_ID = "120363409024011943@newsletter"
+CHANNELS = {
+    "main": "120363409024011943@newsletter",
+    "test": "120363428624809722@newsletter"
+}
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 WINDOWS = {
@@ -23,7 +26,7 @@ WINDOWS = {
 }
 
 
-def send_whatsapp_text(message: str) -> dict:
+def send_whatsapp_text(message: str, channel_id: str) -> dict:
 
     url = "http://localhost:3000/api/sendText"
     headers = {
@@ -32,7 +35,7 @@ def send_whatsapp_text(message: str) -> dict:
     }
     data = {
         "session": SESSION_NAME,
-        "chatId": CHANNEL_ID,
+        "chatId": channel_id,
         "text": message
     }
 
@@ -161,8 +164,11 @@ def format_crawled_items(items: List[Dict]) -> str:
 
 def send_crawled_info_to_whatsapp(items: List[Dict]) -> dict | None:
     message = format_crawled_items(items)
-    if message:
-        return send_whatsapp_text(message)
+    for channel_type, channel_id in CHANNELS.items():
+        if channel_type == "main" and message:
+            send_whatsapp_text(message, channel_id)
+        else:
+            send_whatsapp_text(message or "Không có thông tin mới được crawl.", channel_id)
 
 
 if __name__ == "__main__":
