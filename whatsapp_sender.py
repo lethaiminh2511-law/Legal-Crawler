@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SESSION_NAME = os.getenv("SESSION_NAME", "default")
-WHATSAPP_API_KEY = os.getenv("WHATSAPP_API_KEY")
+WAHA_API_KEY = os.getenv("WAHA_API_KEY")
 CHANNELS = {
     "main": "120363409024011943@newsletter",
     "test": "120363428624809722@newsletter"
@@ -30,7 +30,7 @@ def send_whatsapp_text(message: str, channel_id: str) -> dict:
 
     url = "http://localhost:3000/api/sendText"
     headers = {
-        "X-Api-Key": WHATSAPP_API_KEY,
+        "X-Api-Key": WAHA_API_KEY,
         "Content-Type": "application/json",
     }
     data = {
