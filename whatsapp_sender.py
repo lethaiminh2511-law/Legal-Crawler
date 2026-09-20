@@ -165,8 +165,9 @@ def format_crawled_items(items: List[Dict]) -> str:
 def send_crawled_info_to_whatsapp(items: List[Dict]) -> dict | None:
     message = format_crawled_items(items)
     for channel_type, channel_id in CHANNELS.items():
-        if channel_type == "main" and message:
-            send_whatsapp_text(message, channel_id)
+        if channel_type == "main":
+            if message:
+                send_whatsapp_text(message, channel_id)
         else:
             send_whatsapp_text(message or "Không có thông tin mới được crawl.", channel_id)
 
