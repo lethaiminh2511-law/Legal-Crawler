@@ -3,6 +3,7 @@ import json
 import requests
 import argparse
 from datetime import datetime, time, timedelta
+from time import sleep
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -17,6 +18,7 @@ CHANNELS = {
     "test": "120363428624809722@newsletter"
 }
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+IDLE_BETWEEN_MESSAGES = 1
 
 WINDOWS = {
     "morning": (time(22, 0), time(10, 0)),
@@ -132,44 +134,46 @@ def filter_items_by_window(items: List[Dict], window: str, now: Optional[datetim
     ]
 
 
-def format_crawled_items(items: List[Dict]) -> str:
+def format_crawled_item(item: Dict) -> str:
     """
-    Format danh sách bài đã crawl thành message ngắn để gửi WhatsApp.
+    Format một bài đã crawl thành message ngắn để gửi WhatsApp.
     """
+    title = (item.get("title", "") or "").strip()
+    source = (item.get("source", "") or "").strip()
+    published_at = (item.get("published_at", "") or "").strip()
+    summary = (item.get("summary_raw", "") or "").strip()
+    url = (item.get("url", "") or "").strip()
 
+    return (
+        f"📰 *{title}*\n\n"
+        f"🏛️ *Nguồn:* {source}\n"
+        f"📅 *Thời gian:* {published_at}\n\n"
+        f"📝 *Tóm tắt*\n"
+        f"{summary}\n\n"
+        f"🔗 *Chi tiết:*\n{url}"
+    )
+
+
+def format_crawled_items(items: List[Dict]) -> List[str]:
+    """
+    Trả về danh sách message, mỗi bài một message.
+    """
     if not items:
-        return None
+        return []
 
-    lines = ["Legal Crawler - Có thông tin mới:\n"]
-
-    for idx, item in enumerate(items, start=1):
-        title = (item.get("title", "") or "").strip()
-        source = (item.get("source", "") or "").strip()
-        published_at = (item.get("published_at", "") or "").strip()
-        summary = (item.get("summary_raw", "") or "").strip()
-        url = (item.get("url", "") or "").strip()
-
-        lines.append(
-            f"📰 *{title}*\n\n"
-            f"🏛️ *Nguồn:* {source}\n"
-            f"📅 *Thời gian:* {published_at}\n\n"
-            f"📝 *Tóm tắt*\n"
-            f"{summary}\n\n"
-            f"🔗 *Chi tiết:*\n{url}\n"
-            f"{'─' * 10}\n"
-        )
-
-    return "\n".join(lines)
+    return [format_crawled_item(item) for item in items]
 
 
-def send_crawled_info_to_whatsapp(items: List[Dict]) -> dict | None:
-    message = format_crawled_items(items)
+def send_crawled_info_to_whatsapp(items: List[Dict]) -> None:
+    messages = format_crawled_items(items)
+
     for channel_type, channel_id in CHANNELS.items():
-        if channel_type == "main":
-            if message:
+        if messages:
+            for message in messages:
                 send_whatsapp_text(message, channel_id)
-        else:
-            send_whatsapp_text(message or "Không có thông tin mới được crawl.", channel_id)
+                sleep(IDLE_BETWEEN_MESSAGES)
+        elif channel_type != "main":
+            send_whatsapp_text("Không có thông tin mới được crawl.", channel_id)
 
 
 if __name__ == "__main__":
