@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SESSION_NAME = os.getenv("SESSION_NAME", "default")
-WAHA_API_KEY = os.getenv("WAHA_API_KEY")
+WAHA_API_KEY = os.getenv("WAHA_API_KEY", os.getenv("WHATSAPP_API_KEY"))
 CHANNELS = {
     "main": "120363409024011943@newsletter",
     "test": "120363428624809722@newsletter"

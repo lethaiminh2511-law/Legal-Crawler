@@ -93,9 +93,9 @@ def run_whatsapp_sender():
 
 
 def main():
-    success = run_crawlers()
-    if not success:
-        print("\n⛔ Some crawlers failed.")
+    # success = run_crawlers()
+    # if not success:
+    #     print("\n⛔ Some crawlers failed.")
     run_whatsapp_sender()
 
 
