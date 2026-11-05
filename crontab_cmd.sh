@@ -1,0 +1,1 @@
+55 9,14,16,21 * * * cd /workspace/Legal-Crawler && /usr/bin/flock -n /tmp/legal-crawler.lock /workspace/Legal-Crawler/.venv/bin/python main.py >> logs/cro>
