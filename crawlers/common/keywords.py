@@ -119,7 +119,8 @@ TOPIC_KEYWORDS = [
     "quản lý ngoại thương",
     "đầu tư nước ngoài",
     "kinh doanh bất động sản",
-    "luật đầu tư"
+    "luật đầu tư",
+    "tài sản mã hóa"
 ]
 
 
